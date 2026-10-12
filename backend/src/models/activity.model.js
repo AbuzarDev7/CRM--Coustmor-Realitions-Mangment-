@@ -1,0 +1,33 @@
+import mongoose from "mongoose";
+
+const activitySchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    description: {
+      type: String,
+      default: "",
+      trim: true
+    },
+    type: {
+      type: String,
+      enum: ["deal", "lead", "system", "payment", "staff", "other"],
+      default: "system"
+    },
+    user: {
+      type: String,
+      default: "System"
+    },
+    timeAgo: {
+      type: String,
+      default: "Just now"
+    }
+  },
+  { timestamps: true }
+);
+
+export const Activity = mongoose.model("Activity", activitySchema);
+export default Activity;

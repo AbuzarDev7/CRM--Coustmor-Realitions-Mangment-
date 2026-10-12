@@ -3,6 +3,7 @@ import { z } from "zod";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import User from "../models/user.model.js";
+import Staff from "../models/staff.model.js";
 import { redis } from "../config/redis.js";
 import { transporter } from "../config/nodemailer.js";
 
@@ -16,11 +17,17 @@ export const register = async (req, res) => {
   try {
     const registerSchema = z.object({
       email: z.string().email(),
-      password: z.string().min(6)
+      password: z.string().min(6),
+      role: z.enum(["admin", "engineer", "customer", "custmor", "user"]).optional(),
+      name: z.string().optional()
     });
 
-    const { email, password } = registerSchema.parse(req.body);
+    const { email, password, role, name } = registerSchema.parse(req.body);
     const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if user is owner/admin from .env or requested admin
+    const ownerEmail = (process.env.GMAIL_USER || "").toLowerCase().trim();
+    const assignedRole = role || (normalizedEmail === ownerEmail ? "admin" : "customer");
 
     // Check karo user pehle se exist toh nahi karta
     const existingUser = await User.findOne({ email: normalizedEmail });
@@ -32,14 +39,18 @@ export const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     if (existingUser && !existingUser.isVerified) {
-      // Agar pehle register kiya tha lekin verify nahi kiya, password update kardo
+      // Agar pehle register kiya tha lekin verify nahi kiya, password aur role update kardo
       existingUser.password = hashedPassword;
+      existingUser.role = assignedRole;
+      if (name) existingUser.name = name;
       await existingUser.save();
     } else {
-      // Naya unverified user banao
+      // Naya unverified user banao with assigned role
       await User.create({
         email: normalizedEmail,
         password: hashedPassword,
+        name: name || "",
+        role: assignedRole,
         isVerified: false
       });
     }
@@ -105,9 +116,13 @@ export const verifyOtp = async (req, res) => {
     // Redis se OTP delete kardo taake dubara use na ho
     await redis.del(`otp:${normalizedEmail}`);
 
+    // Resolve full name from Staff profile or User model
+    const staffProfile = await Staff.findOne({ email: user.email.toLowerCase() });
+    const displayName = user.name || staffProfile?.name || user.email.split("@")[0];
+
     // JWT Token generate karo
     const token = jwt.sign(
-      { userId: user._id, email: user.email, role: user.role },
+      { userId: user._id, name: displayName, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -120,11 +135,12 @@ export const verifyOtp = async (req, res) => {
     });
 
     return res.json({
-      message: "Email verified successfully! You are now logged in.",
+      message: "Email verified successfully! Registration complete. Please log in.",
       accessToken: token,
       token,
       user: {
         id: user._id,
+        name: displayName,
         email: user.email,
         role: user.role
       }
@@ -144,17 +160,27 @@ export const login = async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+    console.log("[LOGIN ATTEMPT] Email:", normalizedEmail);
 
     // MongoDB mein user dhoondo
     const user = await User.findOne({ email: normalizedEmail });
+    console.log("[LOGIN ATTEMPT] User found in DB:", !!user);
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
+    console.log("[LOGIN ATTEMPT] isVerified:", user.isVerified, "hasPassword:", !!user.password);
 
     // Check karo kya user ne OTP verify kiya tha?
     if (!user.isVerified) {
       return res.status(403).json({
         error: "Account not verified. Please verify your email first."
+      });
+    }
+
+    // Check if user is an OAuth user without password
+    if (!user.password) {
+      return res.status(400).json({
+        error: `This account was registered using ${user.provider || "OAuth"}. Please sign in with ${user.provider || "GitHub/Google"}.`
       });
     }
 
@@ -164,9 +190,13 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    // Resolve full name from Staff profile or User model
+    const staffProfile = await Staff.findOne({ email: user.email.toLowerCase() });
+    const displayName = user.name || staffProfile?.name || user.email.split("@")[0];
+
     // JWT Token banao
     const token = jwt.sign(
-      { userId: user._id, email: user.email, role: user.role },
+      { userId: user._id, name: displayName, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -184,6 +214,7 @@ export const login = async (req, res) => {
       token,
       user: {
         id: user._id,
+        name: displayName,
         email: user.email,
         role: user.role
       }

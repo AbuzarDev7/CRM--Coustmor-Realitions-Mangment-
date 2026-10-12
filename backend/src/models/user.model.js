@@ -9,9 +9,33 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true
     },
+    name: {
+      type: String,
+      default: "",
+      trim: true
+    },
+    avatar: {
+      type: String,
+      default: ""
+    },
+    provider: {
+      type: String,
+      enum: ["local", "google", "github"],
+      default: "local"
+    },
+    googleId: {
+      type: String,
+      sparse: true
+    },
+    githubId: {
+      type: String,
+      sparse: true
+    },
     password: {
       type: String,
-      required: true
+      required: function () {
+        return this.provider === "local";
+      }
     },
     isVerified: {
       type: Boolean,
@@ -19,7 +43,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["admin", "engineer", "customer", "custmor", "user"],
+      enum: ["admin", "manager", "staff", "agent", "sales_agent", "engineer", "customer", "custmor", "user"],
       default: "customer",
       lowercase: true,
       trim: true

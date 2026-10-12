@@ -7,6 +7,7 @@ const Register = () => {
   const [step, setStep] = useState(1) // 1: Registration Form, 2: OTP Verification
   const [formData, setFormData] = useState({
     email: '',
+    role: 'customer',
     password: '',
     confirmPassword: ''
   })
@@ -50,6 +51,7 @@ const Register = () => {
         },
         body: JSON.stringify({
           email: formData.email,
+          role: formData.role,
           password: formData.password
         })
       })
@@ -101,17 +103,15 @@ const Register = () => {
         throw new Error(data.error || 'Invalid or expired OTP.')
       }
 
-      setSuccess('Email verified successfully! Setting up your CRM account...')
-
-      if (data.token || data.accessToken) {
-        localStorage.setItem('crm_token', data.token || data.accessToken)
-      }
-      if (data.user) {
-        localStorage.setItem('crm_user', JSON.stringify(data.user))
-      }
+      setSuccess('Email verified successfully! Redirecting to login...')
 
       setTimeout(() => {
-        navigate('/dashboard')
+        navigate('/login', {
+          state: {
+            email: formData.email,
+            message: 'Registration successful! Please log in to continue.'
+          }
+        })
       }, 1200)
     } catch (err) {
       setError(err.message)
@@ -177,6 +177,23 @@ const Register = () => {
                 placeholder="agent@company.com"
                 className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5" htmlFor="reg-role">
+                Account Role
+              </label>
+              <select
+                id="reg-role"
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+              >
+                <option value="admin">Admin (Full Access)</option>
+                <option value="engineer">Engineer</option>
+                <option value="customer">Customer</option>
+              </select>
             </div>
 
             <div>

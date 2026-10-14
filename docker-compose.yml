@@ -1,0 +1,80 @@
+services:
+  # ==========================================
+  # Node.js Express Backend Service
+  # ==========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: crm-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - ./backend/.env
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      # Connects to your existing MongoDB & Redis via host.docker.internal by default
+      - MONGO_URL=${MONGO_URL:-mongodb://host.docker.internal:27017/auth_db}
+      - REDIS_URL=${REDIS_URL:-redis://:yourpassword@host.docker.internal:6379}
+      - CLIENT_URL=http://localhost:5173
+      - BACKEND_URL=http://localhost:3000
+    networks:
+      - crm-network
+
+  # ==========================================
+  # React + Vite Frontend (Nginx) Service
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_BACKEND_URL=http://localhost:3000
+    container_name: crm-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - crm-network
+
+  # ==========================================
+  # Optional: MongoDB (run with --profile full)
+  # ==========================================
+  mongo:
+    image: mongo:7.0
+    container_name: crm-mongo
+    profiles:
+      - full
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - crm-network
+
+  # ==========================================
+  # Optional: Redis (run with --profile full)
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: crm-redis
+    profiles:
+      - full
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - crm-network
+
+volumes:
+  mongo-data:
+  redis-data:
+
+networks:
+  crm-network:
+    driver: bridge

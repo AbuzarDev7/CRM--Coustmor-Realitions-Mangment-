@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const Home = () => {
+  const { user, isAuthenticated, logout } = useAuth()
   const [activeTab, setActiveTab] = useState('calendar')
   const [activeFaq, setActiveFaq] = useState(0)
   const [heroEmail, setHeroEmail] = useState('')
@@ -79,20 +81,59 @@ const Home = () => {
               <a href="#faq" className="hover:text-white transition">FAQ</a>
             </div>
 
-            {/* Auth Actions */}
+            {/* Dynamic Auth Profile & Actions */}
             <div className="flex items-center gap-3">
-              <Link
-                to="/login"
-                className="text-white/90 hover:text-white text-sm font-medium px-3 py-1.5 transition"
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/register"
-                className="bg-white text-violet-700 hover:bg-violet-50 text-sm font-semibold px-5 py-2 rounded-full shadow-md shadow-purple-950/20 hover:scale-[1.02] transition-all cursor-pointer"
-              >
-                Register
-              </Link>
+              {isAuthenticated && user ? (
+                <>
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-white text-xs font-medium border border-white/20 shadow-xs">
+                    <div className="w-6 h-6 rounded-full bg-white text-violet-700 flex items-center justify-center font-bold text-[11px] shadow-xs">
+                      {user.name ? user.name[0].toUpperCase() : (user.email ? user.email[0].toUpperCase() : 'U')}
+                    </div>
+                    <span className="font-bold text-white max-w-[130px] truncate">{user.name || user.email?.split('@')[0]}</span>
+                    <span className="text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded-full bg-white/30 text-white tracking-wider">
+                      {user.role || 'Member'}
+                    </span>
+                  </div>
+
+                  <Link
+                    to={
+                      user.role === 'manager'
+                        ? '/manager-dashboard'
+                        : user.role === 'agent' || user.role === 'staff'
+                        ? '/agent-dashboard'
+                        : user.role === 'customer' || user.role === 'client'
+                        ? '/portal'
+                        : '/dashboard'
+                    }
+                    className="bg-white text-violet-700 hover:bg-violet-50 text-xs font-bold px-4 py-2 rounded-full shadow-md shadow-purple-950/20 hover:scale-[1.02] transition-all cursor-pointer"
+                  >
+                    Dashboard &rarr;
+                  </Link>
+
+                  <button
+                    onClick={logout}
+                    className="text-white/80 hover:text-white text-xs font-semibold px-2 py-1 transition cursor-pointer"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-white/70 text-xs font-medium hidden sm:inline">Guest</span>
+                  <Link
+                    to="/login"
+                    className="text-white/90 hover:text-white text-sm font-medium px-3 py-1.5 transition"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="bg-white text-violet-700 hover:bg-violet-50 text-sm font-semibold px-5 py-2 rounded-full shadow-md shadow-purple-950/20 hover:scale-[1.02] transition-all cursor-pointer"
+                  >
+                    Register
+                  </Link>
+                </>
+              )}
             </div>
           </nav>
 
@@ -858,7 +899,7 @@ const Home = () => {
             </button>
           </form>
 
-          <div className="flex justify-center items-center gap-6 text-xs text-white/70 pt-2 font-medium">
+          <div className="flex flex-wrap justify-center items-center gap-3 sm:gap-6 text-xs text-white/70 pt-2 font-medium">
             <span>✓ 14-Day Free Trial</span>
             <span>✓ No Credit Card Required</span>
             <span>✓ Instant Onboarding</span>
@@ -870,7 +911,7 @@ const Home = () => {
           FOOTER (MATCHING IMAGE DESIGN)
           ========================================================================= */}
       <footer className="bg-slate-950 text-slate-400 py-12 border-t border-slate-900 text-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-full bg-violet-600 flex items-center justify-center text-white font-bold text-xs">
               O
@@ -879,7 +920,7 @@ const Home = () => {
             <span className="text-slate-600 ml-2">All-in-One CRM Platform</span>
           </div>
 
-          <div className="flex items-center gap-6 font-medium">
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-medium">
             <a href="#solutions" className="hover:text-white transition">Products</a>
             <a href="#features" className="hover:text-white transition">Features</a>
             <a href="#reviews" className="hover:text-white transition">Reviews</a>

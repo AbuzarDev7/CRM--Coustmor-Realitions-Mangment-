@@ -1,0 +1,16 @@
+{
+  "name": "crm-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRM fullstack workspace containerized with Docker",
+  "scripts": {
+    "test": "npm --prefix backend test",
+    "docker:up": "docker compose up --build",
+    "docker:up:d": "docker compose up --build -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:full": "docker compose --profile full up --build",
+    "docker:build-single": "docker build -t crm-app .",
+    "docker:run-single": "docker run -p 3000:3000 --env-file backend/.env crm-app"
+  }
+}

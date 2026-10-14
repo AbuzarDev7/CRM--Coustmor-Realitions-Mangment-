@@ -70,6 +70,21 @@ export const getDashboardStats = async (req, res) => {
       const found = defaultLeadSources.find((s) => s.name === item._id);
       if (found) {
         found.value += item.count;
+      } else if (item._id) {
+        defaultLeadSources.push({
+          name: item._id,
+          value: item.count,
+          color:
+            item._id === "Instagram"
+              ? "#ec4899"
+              : item._id === "Facebook"
+              ? "#3b82f6"
+              : item._id === "LinkedIn"
+              ? "#0ea5e9"
+              : item._id === "WhatsApp"
+              ? "#10b981"
+              : "#6366f1"
+        });
       }
     });
 
@@ -113,10 +128,10 @@ export const getDashboardStats = async (req, res) => {
   }
 };
 
-// Staff Controller Endpoints
+// Staff Controller Endpoints (Retrieves agents/staff from database)
 export const getStaffList = async (req, res) => {
   try {
-    const staff = await Staff.find().sort({ totalValue: -1, createdAt: -1 });
+    const staff = await Staff.find({ category: { $ne: "manager" } }).sort({ totalValue: -1, createdAt: -1 });
     return res.status(200).json({ success: true, count: staff.length, staff });
   } catch (error) {
     console.error("Staff List Error:", error);
@@ -125,61 +140,12 @@ export const getStaffList = async (req, res) => {
 };
 
 export const addStaffMember = async (req, res) => {
-  try {
-    const { name, email, role, monthlyQuota, phone, department } = req.body;
-
-    if (!name || !email) {
-      return res.status(400).json({ error: "Name and email are required" });
-    }
-
-    const existing = await Staff.findOne({ email: email.toLowerCase().trim() });
-    if (existing) {
-      return res.status(400).json({ error: "A staff member with this email already exists" });
-    }
-
-    // Default avatars based on name hash
-    const avatars = [
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80"
-    ];
-    const randomAvatar = avatars[Math.floor(Math.random() * avatars.length)];
-
-    const newStaff = await Staff.create({
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      role: role || "Account Executive",
-      avatar: randomAvatar,
-      monthlyQuota: monthlyQuota ? Number(monthlyQuota) : 40000,
-      phone: phone || "",
-      department: department || "Sales",
-      dealsClosed: 0,
-      totalValue: 0,
-      successRate: 85,
-      status: "Online"
-    });
-
-    // Record activity in database
-    await Activity.create({
-      title: `New staff member joined: ${newStaff.name}`,
-      description: `Assigned as ${newStaff.role} with monthly quota of $${(newStaff.monthlyQuota || 40000).toLocaleString()}`,
-      type: "staff",
-      user: req.user?.email || "Admin",
-      timeAgo: "Just now"
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Staff member added successfully",
-      staff: newStaff
-    });
-  } catch (error) {
-    console.error("Add Staff Error:", error);
-    return res.status(500).json({ error: "Failed to add staff member" });
-  }
+  return res.status(403).json({
+    success: false,
+    error: "Admins are restricted from creating agents. Admins can only create Managers from their dashboard. Agents are managed directly by Managers."
+  });
 };
+
 
 export const deleteStaffMember = async (req, res) => {
   try {

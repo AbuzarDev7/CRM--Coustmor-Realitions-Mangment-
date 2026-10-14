@@ -116,13 +116,23 @@ export const verifyOtp = async (req, res) => {
     // Redis se OTP delete kardo taake dubara use na ho
     await redis.del(`otp:${normalizedEmail}`);
 
-    // Resolve full name from Staff profile or User model
+    // Resolve full name and avatar from Staff profile or User model
     const staffProfile = await Staff.findOne({ email: user.email.toLowerCase() });
     const displayName = user.name || staffProfile?.name || user.email.split("@")[0];
+    const userAvatar = user.avatar || staffProfile?.avatar || "";
 
-    // JWT Token generate karo
+    // Sync avatar between User and Staff if one exists and the other is empty
+    if (user.avatar && staffProfile && !staffProfile.avatar) {
+      staffProfile.avatar = user.avatar;
+      await staffProfile.save().catch(() => {});
+    } else if (!user.avatar && staffProfile?.avatar) {
+      user.avatar = staffProfile.avatar;
+      await user.save().catch(() => {});
+    }
+
+    // JWT Token generate karo (include avatar)
     const token = jwt.sign(
-      { userId: user._id, name: displayName, email: user.email, role: user.role },
+      { userId: user._id, name: displayName, email: user.email, role: user.role, avatar: userAvatar },
       JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -140,9 +150,12 @@ export const verifyOtp = async (req, res) => {
       token,
       user: {
         id: user._id,
+        _id: user._id,
+        userId: user._id,
         name: displayName,
         email: user.email,
-        role: user.role
+        role: user.role,
+        avatar: userAvatar
       }
     });
   } catch (error) {
@@ -190,13 +203,23 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    // Resolve full name from Staff profile or User model
+    // Resolve full name and avatar from Staff profile or User model
     const staffProfile = await Staff.findOne({ email: user.email.toLowerCase() });
     const displayName = user.name || staffProfile?.name || user.email.split("@")[0];
+    const userAvatar = user.avatar || staffProfile?.avatar || "";
 
-    // JWT Token banao
+    // Sync avatar between User and Staff if one exists and the other is empty
+    if (user.avatar && staffProfile && !staffProfile.avatar) {
+      staffProfile.avatar = user.avatar;
+      await staffProfile.save().catch(() => {});
+    } else if (!user.avatar && staffProfile?.avatar) {
+      user.avatar = staffProfile.avatar;
+      await user.save().catch(() => {});
+    }
+
+    // JWT Token banao (include avatar)
     const token = jwt.sign(
-      { userId: user._id, name: displayName, email: user.email, role: user.role },
+      { userId: user._id, name: displayName, email: user.email, role: user.role, avatar: userAvatar },
       JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -214,9 +237,12 @@ export const login = async (req, res) => {
       token,
       user: {
         id: user._id,
+        _id: user._id,
+        userId: user._id,
         name: displayName,
         email: user.email,
-        role: user.role
+        role: user.role,
+        avatar: userAvatar
       }
     });
   } catch (error) {

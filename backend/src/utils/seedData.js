@@ -81,6 +81,20 @@ export const seedDatabaseIfEmpty = async () => {
       ]);
     }
 
+    // Ensure default Admin exists for testing
+    const existingAdmin = await User.findOne({ email: "admin@crm.com" });
+    if (!existingAdmin) {
+      console.log("🌱 Seeding default Admin user...");
+      const hashedPassword = await bcrypt.hash("Admin@1234", 10);
+      await User.create({
+        name: "Super Admin",
+        email: "admin@crm.com",
+        password: hashedPassword,
+        role: "admin",
+        isVerified: true
+      });
+    }
+
     // Ensure at least one Manager exists for testing
     const managerCount = await Staff.countDocuments({ category: "manager" });
     if (managerCount === 0) {

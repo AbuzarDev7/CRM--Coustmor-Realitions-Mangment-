@@ -1,181 +1,100 @@
-import React, { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import React, { useState, useEffect, useMemo } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard,
-  Users,
-  UserCheck,
-  Briefcase,
-  TrendingUp,
-  DollarSign,
-  FileText,
-  Settings,
-  Bell,
   Search,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Download,
-  Filter,
-  CheckCircle2,
-  Clock,
-  ExternalLink,
-  LogOut,
-  Sparkles,
-  ShieldAlert,
+  Bell,
+  Settings,
+  Calendar,
+  ChevronDown,
   ArrowUpRight,
-  MoreVertical,
+  ArrowRight,
+  Check,
   X,
-  Mail,
-  Building,
-  Menu
+  User,
+  Users,
+  Plus,
+  LogOut,
+  Layers,
+  Eye,
+  Sparkles,
+  TrendingUp,
+  FileText,
+  LayoutDashboard
 } from 'lucide-react'
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
   ResponsiveContainer,
+  BarChart,
+  Bar,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  Tooltip,
+  XAxis,
+  YAxis,
+  CartesianGrid
 } from 'recharts'
 import { API_BASE_URL, ADMIN_API_URL } from '../config/api'
+import { useAuth } from '../context/AuthContext'
+import LeadAnalyticsWidget from '../components/LeadAnalyticsWidget'
+import AdminReportsWidget from '../components/AdminReportsWidget'
+import AdminSettingsWidget from '../components/AdminSettingsWidget'
 
-// Mock Data for Charts & Leaderboards
-const initialRevenueData = [
-  { month: 'Jan', revenue: 42000, target: 35000, deals: 32 },
-  { month: 'Feb', revenue: 56000, target: 45000, deals: 44 },
-  { month: 'Mar', revenue: 51000, target: 48000, deals: 39 },
-  { month: 'Apr', revenue: 68000, target: 58000, deals: 52 },
-  { month: 'May', revenue: 79000, target: 65000, deals: 61 },
-  { month: 'Jun', revenue: 74000, target: 70000, deals: 58 },
-  { month: 'Jul', revenue: 89000, target: 75000, deals: 71 },
-  { month: 'Aug', revenue: 98000, target: 82000, deals: 77 },
-  { month: 'Sep', revenue: 112000, target: 90000, deals: 84 },
-  { month: 'Oct', revenue: 128450, target: 95000, deals: 96 }
+// CRM Lead Acquisition Channels matching the Donut Chart slices (28%, 25%, 20%, 15%, 12%)
+const crmLeadChannelsData = [
+  { name: 'Facebook & Social Ads', value: 28, color: '#1877F2' },
+  { name: 'Instagram Leadgen', value: 25, color: '#E4405F' },
+  { name: 'LinkedIn Outreach', value: 20, color: '#0A66C2' },
+  { name: 'Organic Website / SEO', value: 15, color: '#7c3aed' },
+  { name: 'Client Referrals', value: 12, color: '#10b981' }
+]
+
+// Revenue Velocity Bar Chart data matching the attached visual (1 AUG to 8 AUG with $14,867 spike)
+const barRevenueData = [
+  { day: '1 AUG', revenue: 21000 },
+  { day: '2 AUG', revenue: 11200 },
+  { day: '3 AUG', revenue: 14867, label: '$14,867' },
+  { day: '4 AUG', revenue: 13500 },
+  { day: '5 AUG', revenue: 16800 },
+  { day: '6 AUG', revenue: 20400 },
+  { day: '7 AUG', revenue: 24500 },
+  { day: '8 AUG', revenue: 20200 }
 ]
 
 const leadSourcesData = [
   { name: 'Organic Website', value: 596, color: '#7c3aed' },
-  { name: 'Facebook & Social Ads', value: 398, color: '#38bdf8' },
+  { name: 'Facebook & Social Ads', value: 398, color: '#1877F2' },
+  { name: 'LinkedIn Outreach', value: 245, color: '#0A66C2' },
+  { name: 'Twitter / X Campaigns', value: 182, color: '#0f172a' },
   { name: 'Client Referrals', value: 255, color: '#10b981' },
   { name: 'Cold Outreach & Email', value: 171, color: '#f59e0b' }
 ]
 
-const initialTeamMembers = [
-  {
-    id: 1,
-    name: 'Bilal Ahmed',
-    email: 'bilal.a@onesoft.com',
-    role: 'Senior Sales Exec',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-    dealsClosed: 34,
-    totalValue: 46200,
-    successRate: 94,
-    status: 'Online'
-  },
-  {
-    id: 2,
-    name: 'Sara Khan',
-    email: 'sara.k@onesoft.com',
-    role: 'Account Executive',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-    dealsClosed: 28,
-    totalValue: 38900,
-    successRate: 89,
-    status: 'In Meeting'
-  },
-  {
-    id: 3,
-    name: 'Hamza Farooq',
-    email: 'hamza.f@onesoft.com',
-    role: 'Lead Generation Specialist',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-    dealsClosed: 24,
-    totalValue: 27500,
-    successRate: 82,
-    status: 'Online'
-  },
-  {
-    id: 4,
-    name: 'Ayesha Malik',
-    email: 'ayesha.m@onesoft.com',
-    role: 'Customer Success Manager',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80',
-    dealsClosed: 19,
-    totalValue: 21850,
-    successRate: 88,
-    status: 'Offline'
-  }
-]
-
-const initialActivities = [
-  {
-    id: 1,
-    title: 'Agent Bilal closed Deal #301',
-    description: 'Enterprise ERP Subscription for NexaCorp ($14,500/yr)',
-    time: '2 mins ago',
-    type: 'deal',
-    icon: DollarSign,
-    iconColor: 'text-emerald-600 bg-emerald-50'
-  },
-  {
-    id: 2,
-    title: 'New inbound lead assigned to Sara',
-    description: 'CloudNet Inc requested a personalized demo on CRM pipeline',
-    time: '14 mins ago',
-    type: 'lead',
-    icon: Users,
-    iconColor: 'text-violet-600 bg-violet-50'
-  },
-  {
-    id: 3,
-    title: 'System backup & Redis sync completed',
-    description: 'All 1,420 customer data points synchronized successfully',
-    time: '1 hour ago',
-    type: 'system',
-    icon: CheckCircle2,
-    iconColor: 'text-sky-600 bg-sky-50'
-  },
-  {
-    id: 4,
-    title: 'Client Payment Processed',
-    description: 'Invoice #INV-2026-88 paid by Vertex Media ($5,200)',
-    time: '2 hours ago',
-    type: 'payment',
-    icon: TrendingUp,
-    iconColor: 'text-indigo-600 bg-indigo-50'
-  }
-]
-
-const Dashboard = () => {
+const Dashboard = ({ defaultNav = 'dashboard' }) => {
   const navigate = useNavigate()
-  const [user, setUser] = useState(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [activeNav, setActiveNav] = useState('dashboard')
+  const { user: authUser, logout: authLogout } = useAuth()
+  const [user, setUser] = useState(authUser || null)
+
+  // Navigation State: 'dashboard' | 'leads' | 'staff' | 'reports' | 'settings'
+  const [activeNav, setActiveNav] = useState(
+    defaultNav === 'orders' || defaultNav === 'deals' ? 'dashboard' : defaultNav
+  )
+  const [timeRange, setTimeRange] = useState('This month')
+  const [showTimeDropdown, setShowTimeDropdown] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [timeRange, setTimeRange] = useState('10M')
-  
-  // Modals & Popovers
-  const [showAddStaffModal, setShowAddStaffModal] = useState(false)
-  const [showAddManagerModal, setShowAddManagerModal] = useState(false)
+
+  // Top header popovers
   const [showNotifications, setShowNotifications] = useState(false)
   const [showUserDropdown, setShowUserDropdown] = useState(false)
-  
-  // Interactive Staff & Activities State
-  const [teamMembers, setTeamMembers] = useState(initialTeamMembers)
-  const [activities, setActivities] = useState(initialActivities)
-  const [newStaff, setNewStaff] = useState({
-    name: '',
-    email: '',
-    role: 'Account Executive',
-    dealsClosed: 0,
-    totalValue: 0,
-    successRate: 85
-  })
+  const [toastMessage, setToastMessage] = useState('')
+
+  // Database Data States
+  const [kpiStats, setKpiStats] = useState(null)
+  const [teamMembers, setTeamMembers] = useState([])
+  const [managers, setManagers] = useState([])
+  const [leadSources, setLeadSources] = useState(leadSourcesData)
+
+  // Add Manager Modal State (Super Admin Root Control)
+  const [showAddManagerModal, setShowAddManagerModal] = useState(false)
   const [newManager, setNewManager] = useState({
     name: '',
     email: '',
@@ -185,50 +104,78 @@ const Dashboard = () => {
     phone: '',
     password: 'Manager@1234'
   })
-  const [toastMessage, setToastMessage] = useState('')
+
+  // Format today's date: "Today, Mon 22 Nov"
+  const formattedTodayDate = useMemo(() => {
+    const now = new Date()
+    const weekday = now.toLocaleDateString('en-US', { weekday: 'short' })
+    const day = now.getDate()
+    const month = now.toLocaleDateString('en-US', { month: 'short' })
+    return `Today, ${weekday} ${day} ${month}`
+  }, [])
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('crm_user')
-    const token = localStorage.getItem('crm_token')
-
-    if (!token && !storedUser) {
-      navigate('/login')
-      return
+    if (defaultNav) {
+      setActiveNav(
+        defaultNav === 'orders' || defaultNav === 'deals' ? 'dashboard' : defaultNav
+      )
     }
+  }, [defaultNav])
 
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser))
-      } catch (e) {
-        console.error(e)
+  useEffect(() => {
+    if (authUser) {
+      setUser(authUser)
+    } else {
+      const storedUser = localStorage.getItem('crm_user')
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser))
+        } catch (e) {
+          console.error(e)
+        }
       }
     }
+  }, [authUser])
 
-    fetchLiveAdminData()
-  }, [navigate])
+  const showToast = (msg) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(''), 3500)
+  }
 
+  // Fetch live metrics from DB
   const fetchLiveAdminData = async () => {
     try {
       const token = localStorage.getItem('crm_token')
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
 
-      const staffRes = await fetch(`${ADMIN_API_URL}/staff`, { headers, credentials: 'include' })
+      const [mgrRes, staffRes, statsRes] = await Promise.all([
+        fetch(`${ADMIN_API_URL}/managers`, { headers, credentials: 'include' }),
+        fetch(`${ADMIN_API_URL}/staff`, { headers, credentials: 'include' }),
+        fetch(`${ADMIN_API_URL}/dashboard/stats`, { headers, credentials: 'include' })
+      ])
+
+      if (mgrRes.ok) {
+        const mData = await mgrRes.json()
+        setManagers(mData.managers || [])
+      }
       if (staffRes.ok) {
         const sData = await staffRes.json()
-        if (sData.staff && sData.staff.length > 0) {
-          setTeamMembers(sData.staff)
-        }
+        setTeamMembers(sData.staff || [])
+      }
+      if (statsRes.ok) {
+        const stData = await statsRes.json()
+        if (stData.stats) setKpiStats(stData.stats)
+        if (stData.leadSources) setLeadSources(stData.leadSources)
       }
     } catch (e) {
       console.warn('Backend live sync warning:', e.message)
     }
   }
 
-  const showToast = (msg) => {
-    setToastMessage(msg)
-    setTimeout(() => setToastMessage(''), 3500)
-  }
+  useEffect(() => {
+    fetchLiveAdminData()
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -239,22 +186,19 @@ const Dashboard = () => {
     } catch (e) {
       console.error('Logout error:', e)
     } finally {
+      if (authLogout) authLogout()
       localStorage.removeItem('crm_token')
       localStorage.removeItem('crm_user')
+      localStorage.removeItem('crm_admin_settings')
       navigate('/login')
     }
   }
 
-  // Super Admin: Add Manager Handler (Persisted to Database)
+  // Super Admin: Add Manager Submission
   const handleAddManagerSubmit = async (e) => {
     e.preventDefault()
     if (!newManager.name.trim() || !newManager.email.trim()) {
       showToast('Name and work email are required!')
-      return
-    }
-
-    if (!newManager.password.trim()) {
-      showToast('Please assign an initial password for the manager!')
       return
     }
 
@@ -271,9 +215,7 @@ const Dashboard = () => {
       })
 
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to add manager')
-      }
+      if (!res.ok) throw new Error(data.error || 'Failed to add manager')
 
       showToast(`Success: Manager ${newManager.name} registered and saved to database!`)
       setShowAddManagerModal(false)
@@ -286,924 +228,796 @@ const Dashboard = () => {
         phone: '',
         password: 'Manager@1234'
       })
-
-      // Refresh database records immediately
       await fetchLiveAdminData()
     } catch (err) {
       showToast(`Error: ${err.message}`)
     }
   }
 
-  const handleAddStaffSubmit = async (e) => {
-    e.preventDefault()
-    if (!newStaff.name.trim() || !newStaff.email.trim()) return
-
-    try {
-      const token = localStorage.getItem('crm_token')
-      const headers = { 'Content-Type': 'application/json' }
-      if (token) headers['Authorization'] = `Bearer ${token}`
-
-      const res = await fetch(`${ADMIN_API_URL}/staff`, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify(newStaff)
-      })
-
-      if (res.ok) {
-        showToast(`Staff member ${newStaff.name} registered and saved!`)
-        setShowAddStaffModal(false)
-        setNewStaff({
-          name: '',
-          email: '',
-          role: 'Account Executive',
-          dealsClosed: 0,
-          totalValue: 0,
-          successRate: 85
-        })
-        await fetchLiveAdminData()
-        return
-      }
-    } catch (err) {
-      console.warn('Fallback to local state:', err)
-    }
-
-    const member = {
-      id: Date.now(),
-      name: newStaff.name,
-      email: newStaff.email,
-      role: newStaff.role,
-      avatar: `https://images.unsplash.com/photo-${1535713875002 + teamMembers.length}?w=100&auto=format&fit=crop&q=80`,
-      dealsClosed: Number(newStaff.dealsClosed) || 0,
-      totalValue: Number(newStaff.totalValue) || 0,
-      successRate: Number(newStaff.successRate) || 80,
-      status: 'Online'
-    }
-
-    setTeamMembers([member, ...teamMembers])
-    
-    // Add activity log
-    const newAct = {
-      id: Date.now(),
-      title: `New Staff Member Added: ${newStaff.name}`,
-      description: `Assigned as ${newStaff.role} with active CRM dashboard credentials`,
-      time: 'Just now',
-      type: 'user',
-      icon: UserCheck,
-      iconColor: 'text-violet-600 bg-violet-50'
-    }
-    setActivities([newAct, ...activities])
-
-    setShowAddStaffModal(false)
-    setNewStaff({
-      name: '',
-      email: '',
-      role: 'Account Executive',
-      dealsClosed: 0,
-      totalValue: 0,
-      successRate: 85
-    })
-    showToast(`Staff member ${member.name} registered successfully!`)
-  }
-
-  const handleExportCSV = () => {
-    const headers = ['Agent Name,Email,Role,Deals Closed,Total Value ($),Success Rate (%)']
-    const rows = teamMembers.map(
-      (m) => `"${m.name}","${m.email}","${m.role}",${m.dealsClosed},${m.totalValue},${m.successRate}%`
-    )
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n')
-    const encodedUri = encodeURI(csvContent)
-    const link = document.createElement('a')
-    link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `onesoft_crm_report_${new Date().toISOString().slice(0, 10)}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    showToast('Exported CSV file downloaded successfully!')
-  }
-
-  // Filter team members based on search bar
-  const filteredTeamMembers = teamMembers.filter(
-    (m) =>
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.role.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'staff', label: 'Staff / Users', icon: Users, badge: teamMembers.length },
-    { id: 'leads', label: 'Leads', icon: UserCheck, badge: '1.4k' },
-    { id: 'deals', label: 'Deals Pipeline', icon: Briefcase, badge: '86' },
-    { id: 'reports', label: 'Reports', icon: FileText },
-    { id: 'settings', label: 'Settings', icon: Settings }
-  ]
+  // Admin display name
+  const adminName = useMemo(() => {
+    if (user?.name) return user.name.split(' ')[0]
+    if (user?.email) return user.email.split('@')[0]
+    return 'Barbara'
+  }, [user])
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex overflow-hidden font-sans selection:bg-violet-200 selection:text-violet-900">
+    <div className="relative min-h-screen bg-gradient-to-b from-[#7c3aed] via-[#8b5cf6] to-[#f8fafc] p-2.5 sm:p-5 lg:p-7 flex flex-col items-center justify-start font-sans selection:bg-violet-200 selection:text-violet-900 overflow-x-hidden">
       
+      {/* =========================================================================
+          SIGNATURE AURORA MESH BACKGROUND ORBS (FROM HOME.JSX FOR VISUAL CONSISTENCY)
+          ========================================================================= */}
+      <div className="absolute top-[-10%] left-[-10%] w-[55rem] h-[55rem] bg-gradient-to-tr from-[#38bdf8]/40 via-[#818cf8]/50 to-[#c084fc]/40 rounded-full blur-[110px] pointer-events-none" />
+      <div className="absolute top-[5%] right-[-15%] w-[50rem] h-[50rem] bg-gradient-to-bl from-[#a855f7]/50 via-[#38bdf8]/30 to-[#f472b6]/30 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-[40%] left-[25%] w-[45rem] h-[25rem] bg-white/20 rounded-full blur-[90px] pointer-events-none" />
+
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-bounce">
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-2.5 animate-bounce">
           <Sparkles className="w-4 h-4 text-violet-400" />
           <span>{toastMessage}</span>
+          <button onClick={() => setToastMessage('')} className="ml-2 text-slate-400 hover:text-white cursor-pointer">
+            <X className="w-3 h-3" />
+          </button>
         </div>
       )}
 
       {/* =========================================================================
-          1. COLLAPSIBLE SIDEBAR (MATCHING HOME PAGE BRANDING)
+          MAIN FLOATING CARD DASHBOARD SHELL (MATCHING ATTACHED IMAGE & FULLY VISIBLE)
           ========================================================================= */}
-      <aside
-        className={`bg-white border-r border-slate-200/80 transition-all duration-300 z-30 flex flex-col justify-between shadow-sm ${
-          sidebarCollapsed ? 'w-20' : 'w-64'
-        } ${mobileMenuOpen ? 'fixed inset-y-0 left-0 w-64 shadow-2xl' : 'hidden md:flex'}`}
-      >
-        <div>
-          {/* Brand Logo & Collapse Toggle */}
-          <div className="h-18 px-5 border-b border-slate-100 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-violet-500 text-white flex items-center justify-center font-bold shadow-md shadow-violet-500/20 group-hover:scale-105 transition-transform shrink-0">
-                <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2.5" />
-                  <path d="M12 7a5 5 0 015 5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                  <circle cx="12" cy="12" r="2.5" />
-                </svg>
-              </div>
-              {!sidebarCollapsed && (
-                <div>
-                  <h1 className="font-extrabold text-slate-900 text-base tracking-tight leading-tight">
-                    Onesoft CRM
-                  </h1>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">
-                    Admin Suite
-                  </span>
-                </div>
-              )}
+      <div className="relative z-10 w-full max-w-[1560px] bg-white/95 backdrop-blur-2xl rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl shadow-indigo-950/25 border border-white/80 overflow-hidden flex flex-col md:flex-row min-h-[calc(100vh-2.5rem)] md:h-[calc(100vh-3.5rem)]">
+        
+        {/* =====================================================================
+            1. ULTRA-SLEEK VERTICAL ICON SIDEBAR
+            ===================================================================== */}
+        <aside className="w-full md:w-[74px] shrink-0 bg-white border-b md:border-b-0 md:border-r border-slate-100 flex md:flex-col items-center justify-between py-4 px-3 sm:py-6 h-auto md:h-full overflow-y-auto z-30">
+          
+          {/* Top: Spiral / Wave Logo + Chevron */}
+          <div className="flex md:flex-col items-center gap-4">
+            <Link
+              to="/"
+              className="w-10 h-10 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-900 hover:scale-105 transition-transform shadow-2xs"
+              title="Home / CRM Root"
+            >
+              {/* Spiral/Wave glyph from image */}
+              <svg className="w-5 h-5 text-slate-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M4 6.5c2.2-1 4.5-1 7 0s5 1 7.5 0" />
+                <path d="M3 10.5c2.5-1 5.5-1 8 0s5 1 7.5 0" />
+                <path d="M3 14.5c2.5-1 5.5-1 8 0s5.5 1 8 0" />
+                <path d="M4 18.5c2.2-1 4.5-1 7 0s5 1 7.5 0" />
+              </svg>
             </Link>
 
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="hidden md:flex w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 items-center justify-center transition cursor-pointer"
-              title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-            >
-              {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-            </button>
+            <span className="hidden md:block text-slate-300 text-xs select-none">»</span>
           </div>
 
-          {/* Navigation Links */}
-          <div className="p-3 space-y-1.5">
-            <p className={`text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 py-2 ${sidebarCollapsed ? 'text-center' : ''}`}>
-              {sidebarCollapsed ? '•••' : 'Main Menu'}
-            </p>
+          {/* Navigation Icon List */}
+          <nav className="flex md:flex-col items-center gap-2 sm:gap-3">
+            
+            {/* 1. Dashboard / Overview */}
+            <button
+              onClick={() => setActiveNav('dashboard')}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                activeNav === 'dashboard'
+                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25'
+                  : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="Overview Dashboard"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+            </button>
 
-            {navItems.map((item) => {
-              const Icon = item.icon
-              const isActive = activeNav === item.id
-              return (
+            {/* 2. Ingestion & Lead Channels */}
+            <button
+              onClick={() => setActiveNav('leads')}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                activeNav === 'leads'
+                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25'
+                  : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="Social Lead Ingestion & Webhooks"
+            >
+              <Layers className="w-4 h-4" />
+            </button>
+
+            {/* 3. Staff & Managers */}
+            <button
+              onClick={() => setActiveNav('staff')}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                activeNav === 'staff'
+                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25'
+                  : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="Staff & User Management"
+            >
+              <Users className="w-4 h-4" />
+            </button>
+
+            {/* 4. Executive Reports */}
+            <button
+              onClick={() => setActiveNav('reports')}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                activeNav === 'reports'
+                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25'
+                  : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="Executive Reports & Audits"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+
+            {/* 5. Settings */}
+            <button
+              onClick={() => setActiveNav('settings')}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                activeNav === 'settings'
+                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25'
+                  : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="System Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </nav>
+
+          {/* Bottom: Logout Icon */}
+          <button
+            onClick={handleLogout}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+            title="Sign Out"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </aside>
+
+        {/* =====================================================================
+            2. MAIN CONTENT AREA (SMOOTH INTERNAL SCROLLING & ZERO CUT-OFF)
+            ===================================================================== */}
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto bg-[#fafafa]/50">
+          
+          {/* ===================================================================
+              TOP HEADER BAR (SEARCH, DATE PILL, SETTINGS, BELL, AVATAR)
+              =================================================================== */}
+          <header className="sticky top-0 z-20 px-5 sm:px-8 py-3.5 sm:py-4 flex items-center justify-between gap-3 border-b border-slate-100 bg-white/90 backdrop-blur-md shrink-0">
+            
+            {/* Left: Search input + Date pill */}
+            <div className="flex items-center gap-2.5 sm:gap-3 flex-1 max-w-lg">
+              <div className="relative w-full max-w-xs sm:max-w-sm">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search leads, managers, metrics..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-50/80 border border-slate-200/80 rounded-full pl-9 pr-3.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
+                />
+              </div>
+
+              {/* Dynamic Live Date Pill matching image */}
+              <div className="hidden sm:inline-flex items-center px-3 py-1 rounded-full bg-sky-50/80 text-sky-700 text-xs font-bold whitespace-nowrap border border-sky-100">
+                <span>{formattedTodayDate}</span>
+              </div>
+            </div>
+
+            {/* Right: Action Circles & Avatar */}
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              
+              {/* Settings Gear */}
+              <button
+                onClick={() => setActiveNav('settings')}
+                className="w-9 h-9 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+                title="Settings"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+
+              {/* Notification Bell */}
+              <div className="relative">
                 <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveNav(item.id)
-                    setMobileMenuOpen(false)
-                  }}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all cursor-pointer group ${
-                    isActive
-                      ? 'bg-violet-600 text-white shadow-md shadow-violet-600/25 font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                  title={sidebarCollapsed ? item.label : undefined}
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="w-9 h-9 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+                  title="Notifications"
                 >
-                  <div className="flex items-center gap-3">
-                    <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-700'}`} />
-                    {!sidebarCollapsed && <span>{item.label}</span>}
+                  <Bell className="w-4 h-4" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 absolute top-2 right-2.5"></span>
+                </button>
+
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 p-3 z-50 text-xs">
+                    <p className="font-bold text-slate-900 mb-2 pb-1 border-b border-slate-100">Notifications</p>
+                    <div className="space-y-2">
+                      <div className="p-2 rounded-xl bg-violet-50 text-violet-900">
+                        <span className="font-semibold block">New Meta lead ingested</span>
+                        <span className="text-[10px] text-slate-500">Facebook Leadgen • Just now</span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-emerald-50 text-emerald-900">
+                        <span className="font-semibold block">Deal Won: $14,867</span>
+                        <span className="text-[10px] text-slate-500">Enterprise Cloud Migration</span>
+                      </div>
+                    </div>
                   </div>
-                  
-                  {!sidebarCollapsed && item.badge && (
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                        isActive
-                          ? 'bg-white/20 text-white'
-                          : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
+                )}
+              </div>
+
+              {/* Admin Avatar */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserDropdown(!showUserDropdown)}
+                  className="w-9 h-9 rounded-full overflow-hidden border border-slate-200 shadow-2xs hover:ring-2 hover:ring-violet-400 transition cursor-pointer"
+                  title={user?.email || 'Admin Profile'}
+                >
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt="Admin" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center">
+                      {user?.name ? user.name[0].toUpperCase() : (user?.email ? user.email[0].toUpperCase() : 'B')}
+                    </div>
                   )}
                 </button>
-              )
-            })}
-          </div>
-        </div>
 
-        {/* Sidebar Bottom Profile Card */}
-        <div className="p-3 border-t border-slate-100">
-          <div className={`flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition ${sidebarCollapsed ? 'justify-center' : ''}`}>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-bold flex items-center justify-center text-xs shadow-sm shrink-0">
-              {user?.email?.slice(0, 2).toUpperCase() || 'AD'}
+                {showUserDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 text-xs font-semibold">
+                    <div className="px-3.5 py-2 border-b border-slate-100">
+                      <p className="font-bold text-slate-900 truncate">{user?.name || adminName}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{user?.email || 'admin@crm.com'}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setActiveNav('settings')
+                        setShowUserDropdown(false)
+                      }}
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 text-slate-700 flex items-center gap-2 cursor-pointer"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>Account Settings</span>
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 border-t border-slate-50 cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
             </div>
-            {!sidebarCollapsed && (
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-xs font-bold text-slate-800 truncate">{user?.email?.split('@')[0] || 'Administrator'}</p>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span className="text-[10px] text-slate-400 capitalize font-medium">{user?.role || 'Admin'}</span>
+          </header>
+
+          {/* ===================================================================
+              SUB-VIEW ROUTER (OVERVIEW vs LEADS vs STAFF vs REPORTS vs SETTINGS)
+              =================================================================== */}
+          <main className="p-4 sm:p-7 pb-20 space-y-6 flex-1 min-w-0">
+            
+            {/* =================================================================
+                SCREEN 1: OVERVIEW CRM DASHBOARD
+                ================================================================= */}
+            {activeNav === 'dashboard' && (
+              <div className="space-y-6 animate-fade-in">
+                
+                {/* Greeting & Timeframe Select */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                      Hello, {adminName}! 👋
+                    </h1>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                      Executive CRM oversight, pipeline velocity & team performance.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Time Range Dropdown */}
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowTimeDropdown(!showTimeDropdown)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200/90 text-xs font-bold text-slate-800 shadow-2xs hover:bg-slate-50 transition cursor-pointer"
+                      >
+                        <span>{timeRange}</span>
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                      </button>
+
+                      {showTimeDropdown && (
+                        <div className="absolute right-0 mt-1.5 w-36 bg-white rounded-2xl shadow-xl border border-slate-100 py-1 z-50 text-xs font-semibold">
+                          {['Today', 'This week', 'This month', 'This quarter', 'This year'].map((t) => (
+                            <button
+                              key={t}
+                              onClick={() => {
+                                setTimeRange(t)
+                                setShowTimeDropdown(false)
+                              }}
+                              className={`w-full text-left px-3.5 py-1.5 hover:bg-violet-50 transition cursor-pointer ${
+                                timeRange === t ? 'text-violet-700 font-bold bg-violet-50/50' : 'text-slate-700'
+                              }`}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Calendar Pill Button */}
+                    <button
+                      onClick={() => showToast('Calendar date filter active')}
+                      className="w-8 h-8 rounded-full bg-white border border-slate-200/90 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-2xs transition cursor-pointer"
+                      title="Select date range"
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* ROW 1: 4 KPI CARDS (2x2) + REVENUE VELOCITY BAR CHART */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+                  
+                  {/* Left: 4 Metric Cards in 2x2 Grid (6 cols) */}
+                  <div className="lg:col-span-6 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    
+                    {/* Card 1: Total Revenue (Vibrant Purple Filled Card) */}
+                    <div className="bg-gradient-to-br from-[#5356ff] via-[#6366f1] to-[#7c3aed] text-white p-5 rounded-[1.75rem] shadow-lg shadow-indigo-600/20 flex flex-col justify-between relative overflow-hidden group hover:-translate-y-0.5 transition-all">
+                      <div className="flex items-start justify-between">
+                        <span className="text-xs font-semibold text-white/90">Total revenue</span>
+                        <button
+                          onClick={() => setActiveNav('reports')}
+                          className="w-7 h-7 rounded-full bg-white/20 hover:bg-white text-white hover:text-indigo-600 flex items-center justify-center transition cursor-pointer"
+                          title="View Reports"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="my-3">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl sm:text-3xl font-black tracking-tight">
+                            $ {kpiStats?.totalRevenue?.raw ? (kpiStats.totalRevenue.raw / 1000).toFixed(3) : '99.560'}
+                          </span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-400/25 text-emerald-200 border border-emerald-400/30">
+                            ↑ 2.61%
+                          </span>
+                        </div>
+                      </div>
+
+                      <span className="text-[10px] text-white/70 font-medium">This month vs last</span>
+                    </div>
+
+                    {/* Card 2: Active Sales Team / Staff */}
+                    <div className="bg-white border border-slate-100 p-5 rounded-[1.75rem] shadow-xs flex flex-col justify-between hover:-translate-y-0.5 transition-all">
+                      <div className="flex items-start justify-between">
+                        <span className="text-xs font-semibold text-slate-600">Active team staff</span>
+                        <button
+                          onClick={() => setActiveNav('staff')}
+                          className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-900 text-slate-600 hover:text-white flex items-center justify-center transition cursor-pointer"
+                          title="View Staff Directory"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="my-3">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                            {teamMembers.length > 0 ? teamMembers.length : 35}
+                          </span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
+                            ↑ 4.20%
+                          </span>
+                        </div>
+                      </div>
+
+                      <span className="text-[10px] text-slate-400 font-medium">Authorized Managers & Reps</span>
+                    </div>
+
+                    {/* Card 3: Total Leads */}
+                    <div className="bg-white border border-slate-100 p-5 rounded-[1.75rem] shadow-xs flex flex-col justify-between hover:-translate-y-0.5 transition-all">
+                      <div className="flex items-start justify-between">
+                        <span className="text-xs font-semibold text-slate-600">Total active leads</span>
+                        <button
+                          onClick={() => setActiveNav('leads')}
+                          className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-900 text-slate-600 hover:text-white flex items-center justify-center transition cursor-pointer"
+                          title="View Leads"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="my-3">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                            {kpiStats?.totalLeads?.raw ? kpiStats.totalLeads.raw.toLocaleString() : '45.600'}
+                          </span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
+                            +18 today
+                          </span>
+                        </div>
+                      </div>
+
+                      <span className="text-[10px] text-slate-400 font-medium">Real-time Meta Ingestion</span>
+                    </div>
+
+                    {/* Card 4: Deals Win Rate */}
+                    <div className="bg-white border border-slate-100 p-5 rounded-[1.75rem] shadow-xs flex flex-col justify-between hover:-translate-y-0.5 transition-all">
+                      <div className="flex items-start justify-between">
+                        <span className="text-xs font-semibold text-slate-600">Deals win rate</span>
+                        <button
+                          onClick={() => setActiveNav('reports')}
+                          className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-900 text-slate-600 hover:text-white flex items-center justify-center transition cursor-pointer"
+                          title="View Reports"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="my-3">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                            $ 60.450
+                          </span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
+                            ↑ 5.67%
+                          </span>
+                        </div>
+                      </div>
+
+                      <span className="text-[10px] text-slate-400 font-medium">Pipeline velocity vs last</span>
+                    </div>
+
+                  </div>
+
+                  {/* Right: Large Revenue Velocity Bar Chart (6 cols) */}
+                  <div className="lg:col-span-6 min-w-0 bg-white border border-slate-100 p-5 sm:p-6 rounded-[2rem] shadow-xs flex flex-col justify-between">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 className="text-base font-extrabold text-slate-900 tracking-tight">Pipeline Revenue</h3>
+                        <p className="text-[11px] text-slate-400 font-medium">Won contracts this month vs last</p>
+                      </div>
+
+                      <button
+                        onClick={() => setActiveNav('reports')}
+                        className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-violet-600 transition cursor-pointer"
+                        title="View Detailed Revenue Analytics"
+                      >
+                        <ArrowUpRight className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Recharts Bar Chart */}
+                    <div className="h-60 w-full relative pt-2">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={barRevenueData} margin={{ top: 20, right: 10, left: -10, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis
+                            dataKey="day"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                          />
+                          <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: '#94a3b8', fontSize: 10 }}
+                            tickFormatter={(v) => `$ ${v.toLocaleString()}`}
+                            domain={[0, 25000]}
+                            ticks={[0, 1000, 5000, 10000, 15000, 20000, 25000]}
+                          />
+                          <Tooltip
+                            cursor={{ fill: 'rgba(99, 102, 241, 0.05)' }}
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                return (
+                                  <div className="bg-slate-900 text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg">
+                                    ${payload[0].value?.toLocaleString()}
+                                  </div>
+                                )
+                              }
+                              return null
+                            }}
+                          />
+                          <Bar
+                            dataKey="revenue"
+                            fill="#6366f1"
+                            radius={[8, 8, 8, 8]}
+                            barSize={24}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* ROW 2: BOTTOM 3 SECTIONS (QUALIFIED LEADS, LIVE CUSTOMERS, LEAD CHANNELS DONUT) */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+                  
+                  {/* Left: 98 Qualified Leads Card (3 cols) */}
+                  <div
+                    onClick={() => setActiveNav('leads')}
+                    className="lg:col-span-3 min-w-0 bg-white border border-slate-100 p-5 sm:p-6 rounded-[2rem] shadow-xs flex flex-col justify-between hover:shadow-md transition-all cursor-pointer group"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 group-hover:bg-violet-100 group-hover:text-violet-700 transition">
+                      <Check className="w-4 h-4 stroke-[2.5]" />
+                    </div>
+
+                    <div className="my-4">
+                      <h4 className="text-3xl font-black text-slate-900 tracking-tight">
+                        98 <span className="text-lg font-bold text-slate-700">leads</span>
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        12 leads <span className="text-rose-500 font-semibold">are awaiting</span> rep assignment.
+                      </p>
+                    </div>
+
+                    <div className="text-[11px] font-bold text-violet-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                      <span>View Leads Ingestion</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </div>
+                  </div>
+
+                  {/* Center: 17 Customers Card with Wave Graphic & Floating Action Arrow (4 cols) */}
+                  <div className="lg:col-span-4 min-w-0 bg-white border border-slate-100 p-5 sm:p-6 rounded-[2rem] shadow-xs flex flex-col justify-between relative overflow-hidden">
+                    
+                    {/* Abstract wave pattern from image */}
+                    <svg className="absolute right-0 bottom-0 w-44 h-32 text-indigo-200/60 pointer-events-none" viewBox="0 0 150 100" fill="none" stroke="currentColor">
+                      <path d="M10 90 C 40 40, 70 80, 100 20 S 140 60, 150 10" strokeWidth="1.2" strokeDasharray="3 3" />
+                      <path d="M15 95 C 45 45, 75 85, 105 25 S 145 65, 150 15" strokeWidth="1.2" />
+                      <path d="M20 100 C 50 50, 80 90, 110 30 S 150 70, 150 20" strokeWidth="1.2" strokeDasharray="2 2" />
+                    </svg>
+
+                    <div className="flex items-center justify-between">
+                      <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-700">
+                        <User className="w-4 h-4" />
+                      </div>
+
+                      {/* Floating dark circle button from image */}
+                      <button
+                        onClick={() => setActiveNav('leads')}
+                        className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-violet-600 transition shadow-sm cursor-pointer"
+                        title="Open Lead Analytics"
+                      >
+                        <ArrowUpRight className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="my-4 relative z-10">
+                      <h4 className="text-3xl font-black text-slate-900 tracking-tight">
+                        17 <span className="text-lg font-bold text-slate-700">customers</span>
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        17 customers <span className="text-rose-500 font-semibold">are waiting</span> for response.
+                      </p>
+                    </div>
+
+                    <span className="text-[11px] text-slate-400 font-medium">Customer Chat Sessions</span>
+                  </div>
+
+                  {/* Right: Lead Ingestion by Channel Donut Chart (5 cols) */}
+                  <div className="lg:col-span-5 min-w-0 bg-white border border-slate-100 p-5 sm:p-6 rounded-[2rem] shadow-xs flex flex-col justify-between">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
+                          Leads by Channel
+                        </h3>
+                        <p className="text-[11px] text-slate-400 font-medium">This month vs last</p>
+                      </div>
+
+                      <button
+                        onClick={() => setActiveNav('leads')}
+                        className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-violet-600 transition cursor-pointer"
+                        title="View Full Lead Analytics"
+                      >
+                        <ArrowUpRight className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
+                      
+                      {/* Donut with slice labels matching image */}
+                      <div className="sm:col-span-5 min-w-0 h-44 w-full relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={crmLeadChannelsData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={36}
+                              outerRadius={65}
+                              paddingAngle={3}
+                              dataKey="value"
+                              label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                                const RADIAN = Math.PI / 180
+                                const radius = innerRadius + (outerRadius - innerRadius) * 0.5
+                                const x = cx + radius * Math.cos(-midAngle * RADIAN)
+                                const y = cy + radius * Math.sin(-midAngle * RADIAN)
+                                return (
+                                  <text
+                                    x={x}
+                                    y={y}
+                                    fill="#ffffff"
+                                    textAnchor="middle"
+                                    dominantBaseline="central"
+                                    className="text-[9px] font-bold"
+                                  >
+                                    {`${(percent * 100).toFixed(0)}%`}
+                                  </text>
+                                )
+                              }}
+                              labelLine={false}
+                            >
+                              {crmLeadChannelsData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} stroke="#ffffff" strokeWidth={2} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  return (
+                                    <div className="bg-slate-900 text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg">
+                                      {payload[0].name}: {payload[0].value}%
+                                    </div>
+                                  )
+                                }
+                                return null
+                              }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Legend List on Right */}
+                      <div className="sm:col-span-7 min-w-0 space-y-1.5 text-xs">
+                        {crmLeadChannelsData.map((cat, idx) => (
+                          <div key={idx} className="flex items-center gap-2 truncate">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: cat.color }}
+                            />
+                            <span className="text-slate-600 truncate font-semibold text-[11px]">{cat.name}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
+            {/* =================================================================
+                SCREEN 2: SOCIAL MEDIA LEAD INGESTION & WEBHOOKS
+                ================================================================= */}
+            {activeNav === 'leads' && (
+              <LeadAnalyticsWidget />
+            )}
+
+            {/* =================================================================
+                SCREEN 3: EXECUTIVE REPORTS & INTELLIGENCE
+                ================================================================= */}
+            {activeNav === 'reports' && (
+              <AdminReportsWidget
+                kpiStats={kpiStats}
+                revenueData={barRevenueData}
+                leadSources={leadSources}
+                teamMembers={teamMembers}
+                managers={managers}
+                showToast={showToast}
+              />
+            )}
+
+            {/* =================================================================
+                SCREEN 4: ADMIN & PLATFORM SETTINGS
+                ================================================================= */}
+            {activeNav === 'settings' && (
+              <AdminSettingsWidget
+                user={user}
+                showToast={showToast}
+                onUserUpdated={(updated) => setUser(updated)}
+              />
+            )}
+
+            {/* =================================================================
+                SCREEN 5: STAFF & AUTHORIZED MANAGERS DIRECTORY (ROOT OVERSIGHT)
+                ================================================================= */}
+            {activeNav === 'staff' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div>
+                    <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Staff & User Management</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">Inspect all authorized sales managers, agents, and quotas</p>
+                  </div>
+
+                  <button
+                    onClick={() => setShowAddManagerModal(true)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shadow-md transition cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Add Manager</span>
+                  </button>
+                </div>
+
+                {/* Managers Directory */}
+                <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-xs">
+                  <h3 className="font-bold text-base text-slate-900 mb-3">Authorized Managers Directory</h3>
+                  {managers.length === 0 ? (
+                    <p className="text-xs text-slate-400 py-6 text-center">No managers registered yet. Click "+ Add Manager" above.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="text-slate-400 uppercase font-bold border-b border-slate-100 pb-2">
+                            <th className="pb-3 pl-1 font-semibold">Manager Profile</th>
+                            <th className="pb-3 text-center font-semibold">Department</th>
+                            <th className="pb-3 text-right font-semibold">Quota Target</th>
+                            <th className="pb-3 text-center font-semibold">Status</th>
+                            <th className="pb-3 text-right font-semibold pr-1">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {managers.map((mgr) => (
+                            <tr key={mgr._id || mgr.id} className="hover:bg-slate-50/70 transition">
+                              <td className="py-3.5 pl-1">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={mgr.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80'}
+                                    alt={mgr.name}
+                                    className="w-9 h-9 rounded-full object-cover border border-slate-200"
+                                  />
+                                  <div>
+                                    <p className="font-bold text-slate-900">{mgr.name}</p>
+                                    <p className="text-[11px] text-slate-400">{mgr.email}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3.5 text-center">
+                                <span className="px-2.5 py-0.5 rounded-full font-bold text-[11px] bg-slate-100 text-slate-700">
+                                  {mgr.department || 'Sales Management'}
+                                </span>
+                              </td>
+                              <td className="py-3.5 text-right font-extrabold text-slate-900">
+                                ${(mgr.monthlyQuota || 100000).toLocaleString()}/mo
+                              </td>
+                              <td className="py-3.5 text-center">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[11px] bg-emerald-50 text-emerald-700">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                  <span>{mgr.status || 'Active'}</span>
+                                </span>
+                              </td>
+                              <td className="py-3.5 text-right pr-1">
+                                <button
+                                  onClick={() =>
+                                    navigate(
+                                      `/dashboard/manager?managerId=${mgr._id || mgr.id}&managerName=${encodeURIComponent(
+                                        mgr.name
+                                      )}&managerEmail=${encodeURIComponent(mgr.email)}&impersonate=true`
+                                    )
+                                  }
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs transition cursor-pointer"
+                                  title="View and inspect Manager Dashboard"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>View Dashboard</span>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
-          </div>
+
+          </main>
+
         </div>
-      </aside>
 
-      {/* =========================================================================
-          2. MAIN CONTENT AREA & TOP NAVBAR
-          ========================================================================= */}
-      <div className="flex-1 flex flex-col h-screen overflow-y-auto">
-        
-        {/* TOP NAVBAR */}
-        <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 h-18 flex items-center justify-between gap-4 shadow-2xs">
-          
-          {/* Mobile Menu & Global Search */}
-          <div className="flex items-center gap-3 flex-1 max-w-md">
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-
-            <div className="relative w-full">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search staff, leads, deals or invoices..."
-                className="w-full pl-10 pr-12 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
-              />
-              <span className="hidden sm:inline-block absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                ⌘K
-              </span>
-            </div>
-          </div>
-
-          {/* Right Header Controls */}
-          <div className="flex items-center gap-3">
-            
-            {/* Quick Home Page Link */}
-            <Link
-              to="/"
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-600 hover:text-violet-700 bg-slate-50 hover:bg-violet-50 border border-slate-200 hover:border-violet-200 transition"
-              title="Visit CRM Landing Home Page"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Preview Website</span>
-            </Link>
-
-            {/* Notifications Bell */}
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 relative transition cursor-pointer"
-              >
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-violet-600 ring-2 ring-white"></span>
-              </button>
-
-              {/* Notifications Popover */}
-              {showNotifications && (
-                <div className="absolute right-0 mt-3 w-80 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 z-50 animate-fade-in">
-                  <div className="flex justify-between items-center pb-3 border-b border-slate-100 mb-3">
-                    <h4 className="font-bold text-sm text-slate-900">Notifications</h4>
-                    <span className="text-[10px] bg-violet-50 text-violet-700 font-bold px-2 py-0.5 rounded-full">3 New</span>
-                  </div>
-                  <div className="space-y-2.5">
-                    <div className="p-2.5 rounded-xl bg-violet-50/50 hover:bg-violet-50 transition text-xs">
-                      <p className="font-semibold text-slate-800">Deal Closed: NexaCorp</p>
-                      <p className="text-[11px] text-slate-500">Agent Bilal closed $14,500 contract</p>
-                      <span className="text-[10px] text-violet-600 font-medium">5m ago</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition text-xs">
-                      <p className="font-semibold text-slate-800">New Qualified Lead</p>
-                      <p className="text-[11px] text-slate-500">Acme Global assigned to Sara</p>
-                      <span className="text-[10px] text-slate-400 font-medium">20m ago</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Admin Avatar & Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-2 p-1.5 pl-2.5 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition cursor-pointer"
-              >
-                <div className="text-right hidden sm:block">
-                  <p className="text-xs font-bold text-slate-900 leading-tight">{user?.email?.split('@')[0] || 'Admin'}</p>
-                  <p className="text-[10px] font-semibold text-violet-600 uppercase tracking-wider">{user?.role || 'Admin'}</p>
-                </div>
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-bold flex items-center justify-center text-xs shadow-md shadow-violet-500/20">
-                  {user?.email?.slice(0, 2).toUpperCase() || 'AD'}
-                </div>
-              </button>
-
-              {/* User Menu Dropdown */}
-              {showUserDropdown && (
-                <div className="absolute right-0 mt-3 w-56 bg-white border border-slate-200 rounded-2xl shadow-2xl p-2 z-50 animate-fade-in text-xs">
-                  <div className="p-3 border-b border-slate-100 mb-1">
-                    <p className="font-bold text-slate-900 text-sm">{user?.email}</p>
-                    <span className="inline-block mt-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700">
-                      Role: {user?.role || 'Admin'}
-                    </span>
-                  </div>
-                  <Link
-                    to="/"
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 font-medium transition"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                    <span>View Home Landing</span>
-                  </Link>
-                  <button
-                    onClick={() => {
-                      showToast('System configuration is running on latest build.')
-                      setShowUserDropdown(false)
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-50 font-medium transition cursor-pointer"
-                  >
-                    <Settings className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Platform Settings</span>
-                  </button>
-                  <div className="border-t border-slate-100 my-1"></div>
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-red-600 hover:bg-red-50 font-semibold transition cursor-pointer"
-                  >
-                    <LogOut className="w-3.5 h-3.5 text-red-500" />
-                    <span>Sign Out</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-          </div>
-        </header>
-
-        {/* =========================================================================
-            DASHBOARD BODY
-            ========================================================================= */}
-        <main className="p-4 sm:p-8 max-w-7xl mx-auto w-full space-y-8">
-          
-          {/* ACTION TOOLBAR & GREETING */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-bold text-violet-600 tracking-wider uppercase bg-violet-50 px-2.5 py-0.5 rounded-full">
-                  Admin Control Center
-                </span>
-                <span className="text-xs text-slate-400">• Real-Time Sync</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                Enterprise Dashboard
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Live performance metrics, revenue growth, and active sales team operations.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-              <Link
-                to="/manager-dashboard"
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-100 hover:bg-violet-50 border border-slate-200 text-slate-700 hover:text-violet-700 font-semibold text-xs transition cursor-pointer"
-              >
-                <Users className="w-3.5 h-3.5 text-violet-600" />
-                <span>Manager Portal View</span>
-              </Link>
-
-              <button
-                onClick={handleExportCSV}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs shadow-xs transition cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-slate-500" />
-                <span>Export CSV</span>
-              </button>
-
-              <button
-                onClick={() => setShowAddManagerModal(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-600/25 hover:scale-[1.02] transition cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Add Manager</span>
-              </button>
-
-              <button
-                onClick={() => setShowAddStaffModal(true)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-md shadow-violet-600/30 hover:scale-[1.02] transition cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Add Staff Member</span>
-              </button>
-            </div>
-          </div>
-
-          {/* =========================================================================
-              3. TOP KPI CARDS (4 STAT CARDS IN A RESPONSIVE GRID)
-              ========================================================================= */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            
-            {/* KPI 1: Total Revenue */}
-            <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-slate-500">Total Revenue</span>
-                <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shadow-xs">
-                  <DollarSign className="w-5 h-5" />
-                </div>
-              </div>
-              <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">$128,450</p>
-              <div className="flex items-center gap-2 mt-2.5 text-xs">
-                <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">
-                  <ArrowUpRight className="w-3.5 h-3.5" /> +12.5%
-                </span>
-                <span className="text-slate-400">vs. last month</span>
-              </div>
-            </div>
-
-            {/* KPI 2: Total Leads */}
-            <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-slate-500">Total Leads</span>
-                <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-xs">
-                  <Users className="w-5 h-5" />
-                </div>
-              </div>
-              <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">1,420</p>
-              <div className="flex items-center gap-2 mt-2.5 text-xs">
-                <span className="inline-flex items-center gap-0.5 text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full font-bold">
-                  <ArrowUpRight className="w-3.5 h-3.5" /> +8.2%
-                </span>
-                <span className="text-slate-400">monthly increase</span>
-              </div>
-            </div>
-
-            {/* KPI 3: Active Deals */}
-            <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-slate-500">Active Deals</span>
-                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shadow-xs">
-                  <Briefcase className="w-5 h-5" />
-                </div>
-              </div>
-              <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">86</p>
-              <div className="flex items-center gap-2 mt-2.5 text-xs">
-                <span className="inline-flex items-center text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full font-bold">
-                  Ongoing Pipeline
-                </span>
-                <span className="text-slate-400">avg 14 days cycle</span>
-              </div>
-            </div>
-
-            {/* KPI 4: Conversion Rate */}
-            <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-slate-500">Conversion Rate</span>
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-xs">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-              </div>
-              <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">24.8%</p>
-              <div className="flex items-center gap-2 mt-2.5 text-xs">
-                <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">
-                  <ArrowUpRight className="w-3.5 h-3.5" /> +2.1%
-                </span>
-                <span className="text-slate-400">progress benchmark</span>
-              </div>
-            </div>
-
-          </div>
-
-          {/* =========================================================================
-              4. VISUAL ANALYTICS SECTION (RECHARTS AREA & DONUT GRAPHS)
-              ========================================================================= */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* Left: Revenue Growth Area Chart (7 cols) */}
-            <div className="lg:col-span-8 bg-white border border-slate-200/80 p-6 rounded-3xl shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-4 border-b border-slate-100 gap-3">
-                <div>
-                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
-                    Revenue Growth Analytics
-                  </h3>
-                  <p className="text-xs text-slate-500">Monthly pipeline closes vs assigned revenue targets</p>
-                </div>
-                
-                {/* Time Range Pills */}
-                <div className="bg-slate-100 p-1 rounded-full inline-flex gap-1">
-                  {['3M', '6M', '10M', '1Y'].map((range) => (
-                    <button
-                      key={range}
-                      onClick={() => setTimeRange(range)}
-                      className={`px-3 py-1 text-xs font-semibold rounded-full transition cursor-pointer ${
-                        timeRange === range
-                          ? 'bg-violet-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      {range}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Area Chart with Home Page Theme Color Palette */}
-              <div className="h-72 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={initialRevenueData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.0} />
-                      </linearGradient>
-                      <linearGradient id="targetGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis
-                      dataKey="month"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: '#64748b', fontSize: 11 }}
-                      tickFormatter={(val) => `$${val / 1000}k`}
-                    />
-                    <Tooltip
-                      content={({ active, payload, label }) => {
-                        if (active && payload && payload.length) {
-                          return (
-                            <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-xs space-y-1 border border-slate-700">
-                              <p className="font-bold text-violet-300">{label} 2026</p>
-                              <p className="font-semibold text-emerald-400">
-                                Revenue: ${payload[0]?.value?.toLocaleString()}
-                              </p>
-                              <p className="text-sky-300">Target: ${payload[1]?.value?.toLocaleString()}</p>
-                            </div>
-                          )
-                        }
-                        return null
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="#7c3aed"
-                      strokeWidth={3}
-                      fillOpacity={1}
-                      fill="url(#revenueGradient)"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="target"
-                      stroke="#38bdf8"
-                      strokeWidth={2}
-                      strokeDasharray="4 4"
-                      fillOpacity={1}
-                      fill="url(#targetGradient)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Chart Legend Footer */}
-              <div className="flex items-center justify-center gap-6 pt-3 text-xs text-slate-500 font-medium">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-violet-600"></span>
-                  <span>Closed Revenue ($)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-sky-400"></span>
-                  <span>Target Benchmark ($)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Lead Acquisition Channels Donut Chart (4 cols) */}
-            <div className="lg:col-span-4 bg-white border border-slate-200/80 p-6 rounded-3xl shadow-sm flex flex-col justify-between">
-              <div>
-                <h3 className="text-base sm:text-lg font-extrabold text-slate-900 mb-1">
-                  Lead Sources
-                </h3>
-                <p className="text-xs text-slate-500 mb-4">Channel acquisition breakdown</p>
-
-                <div className="h-52 w-full relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={leadSourcesData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={80}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        {leadSourcesData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-slate-900 text-white p-2 rounded-lg text-xs shadow-lg">
-                                <p className="font-bold">{payload[0].name}</p>
-                                <p className="text-violet-300">{payload[0].value} Leads</p>
-                              </div>
-                            )
-                          }
-                          return null
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-
-                  {/* Centered Total Count */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-2xl font-extrabold text-slate-900">1,420</span>
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Total Leads</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Source breakdown list */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                {leadSourcesData.map((source, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: source.color }} />
-                      <span className="text-slate-600 font-medium">{source.name}</span>
-                    </div>
-                    <span className="font-bold text-slate-900">{source.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-
-          {/* =========================================================================
-              5. OPERATIONAL PANELS (TEAM LEADERBOARD & LIVE ACTIVITY TIMELINE)
-              ========================================================================= */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* Left: Team Performance Leaderboard (7 cols) */}
-            <div className="lg:col-span-7 bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
-              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
-                <div>
-                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
-                    Team Performance Leaderboard
-                  </h3>
-                  <p className="text-xs text-slate-500">Deals closed and conversion velocity per sales executive</p>
-                </div>
-                <span className="text-xs font-bold text-violet-700 bg-violet-50 px-3 py-1 rounded-full">
-                  {filteredTeamMembers.length} Agents Active
-                </span>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="text-slate-400 uppercase font-bold border-b border-slate-100 pb-2">
-                      <th className="pb-3 font-semibold">Agent</th>
-                      <th className="pb-3 font-semibold text-center">Deals</th>
-                      <th className="pb-3 font-semibold text-right">Closed ($)</th>
-                      <th className="pb-3 font-semibold text-center">Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredTeamMembers.map((agent) => (
-                      <tr key={agent._id || agent.id} className="hover:bg-slate-50/70 transition">
-                        <td className="py-3.5 pr-2">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={agent.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
-                              alt={agent.name}
-                              className="w-9 h-9 rounded-full object-cover border border-slate-200"
-                            />
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-bold text-slate-900 text-xs sm:text-sm">{agent.name}</p>
-                                {agent.category === 'manager' && (
-                                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
-                                    Manager
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-slate-400">{agent.role}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 text-center font-bold text-slate-800">
-                          {agent.dealsClosed}
-                        </td>
-                        <td className="py-3.5 text-right font-extrabold text-slate-900">
-                          ${agent.totalValue.toLocaleString()}
-                        </td>
-                        <td className="py-3.5 text-center">
-                          <span
-                            className={`inline-block px-2.5 py-0.5 rounded-full font-bold text-[11px] ${
-                              agent.successRate >= 90
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-violet-50 text-violet-700'
-                            }`}
-                          >
-                            {agent.successRate}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Right: Live Activity Timeline (5 cols) */}
-            <div className="lg:col-span-5 bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
-                  <div>
-                    <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
-                      Live Operations Timeline
-                    </h3>
-                    <p className="text-xs text-slate-500">Real-time alerts and user activities</p>
-                  </div>
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" title="Live stream active"></span>
-                </div>
-
-                <div className="space-y-4">
-                  {activities.map((act) => {
-                    const ActIcon = act.icon
-                    return (
-                      <div key={act.id} className="flex items-start gap-3.5">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${act.iconColor}`}>
-                          <ActIcon className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className="font-bold text-xs text-slate-800 truncate">{act.title}</p>
-                            <span className="text-[10px] text-slate-400 whitespace-nowrap ml-2">{act.time}</span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
-                            {act.description}
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="pt-4 mt-4 border-t border-slate-100 text-center">
-                <button
-                  onClick={() => showToast('Full audit log stream updated.')}
-                  className="text-xs font-semibold text-violet-600 hover:text-violet-700 transition cursor-pointer"
-                >
-                  View Full Audit Log Stream →
-                </button>
-              </div>
-            </div>
-
-          </div>
-
-        </main>
       </div>
 
       {/* =========================================================================
-          MODAL: ADD NEW STAFF MEMBER
-          ========================================================================= */}
-      {showAddStaffModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-7 border border-slate-200 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
-                  <UserCheck className="w-4 h-4" />
-                </div>
-                <h3 className="font-bold text-slate-900 text-base">Add New Staff Member</h3>
-              </div>
-              <button
-                onClick={() => setShowAddStaffModal(false)}
-                className="w-7 h-7 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddStaffSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={newStaff.name}
-                  onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
-                  placeholder="e.g. Daniyal Tariq"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Work Email</label>
-                <input
-                  type="email"
-                  required
-                  value={newStaff.email}
-                  onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
-                  placeholder="daniyal@onesoft.com"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Role Title</label>
-                  <select
-                    value={newStaff.role}
-                    onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-xs"
-                  >
-                    <option value="Senior Sales Exec">Senior Sales Exec</option>
-                    <option value="Account Executive">Account Executive</option>
-                    <option value="Lead Specialist">Lead Specialist</option>
-                    <option value="Customer Success">Customer Success</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Success Rate (%)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={newStaff.successRate}
-                    onChange={(e) => setNewStaff({ ...newStaff, successRate: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Deals Closed</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={newStaff.dealsClosed}
-                    onChange={(e) => setNewStaff({ ...newStaff, dealsClosed: e.target.value })}
-                    placeholder="12"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Total Closed Value ($)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={newStaff.totalValue}
-                    onChange={(e) => setNewStaff({ ...newStaff, totalValue: e.target.value })}
-                    placeholder="15000"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAddStaffModal(false)}
-                  className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-full bg-violet-600 hover:bg-violet-700 text-white font-semibold shadow-md shadow-violet-600/25 transition cursor-pointer"
-                >
-                  Confirm & Add
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          SUPER ADMIN: ADD MANAGER MODAL
+          MODAL: ADD MANAGER (SUPER ADMIN ROOT CONTROL)
           ========================================================================= */}
       {showAddManagerModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
@@ -1228,120 +1042,79 @@ const Dashboard = () => {
 
             <form onSubmit={handleAddManagerSubmit} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Manager Full Name *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Full Name *</label>
                 <input
                   type="text"
                   required
                   value={newManager.name}
                   onChange={(e) => setNewManager({ ...newManager, name: e.target.value })}
-                  placeholder="e.g. Imran Siddiqui"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="e.g. Haider Abbas"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Official Work Email *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Work Email (Login ID) *</label>
                 <input
                   type="email"
                   required
                   value={newManager.email}
                   onChange={(e) => setNewManager({ ...newManager, email: e.target.value })}
-                  placeholder="manager@onesoft.com"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="e.g. haider@gmail.com"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Manager Position</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Department</label>
                   <select
-                    value={newManager.role}
-                    onChange={(e) => setNewManager({ ...newManager, role: e.target.value })}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs"
+                    value={newManager.department}
+                    onChange={(e) => setNewManager({ ...newManager, department: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                   >
-                    <option value="Regional Sales Manager">Regional Sales Manager</option>
-                    <option value="Enterprise Sales Director">Enterprise Sales Director</option>
-                    <option value="Operations & Team Lead">Operations & Team Lead</option>
-                    <option value="Client Success Lead">Client Success Lead</option>
+                    <option value="Sales Management">Sales Management</option>
+                    <option value="Enterprise Solutions">Enterprise Solutions</option>
+                    <option value="Lead Operations">Lead Operations</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Department</label>
-                  <input
-                    type="text"
-                    value={newManager.department}
-                    onChange={(e) => setNewManager({ ...newManager, department: e.target.value })}
-                    placeholder="Sales Management"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Team Target Quota ($)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Monthly Quota ($)</label>
                   <input
                     type="number"
                     value={newManager.monthlyQuota}
-                    onChange={(e) => setNewManager({ ...newManager, monthlyQuota: e.target.value })}
-                    placeholder="100000"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
-                  <input
-                    type="text"
-                    value={newManager.phone}
-                    onChange={(e) => setNewManager({ ...newManager, phone: e.target.value })}
-                    placeholder="+92 301 0000000"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    onChange={(e) => setNewManager({ ...newManager, monthlyQuota: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                   />
                 </div>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block font-semibold text-slate-700">Assign Manager Password *</label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const randomPass = 'Mgr@' + Math.floor(1000 + Math.random() * 9000)
-                      setNewManager({ ...newManager, password: randomPass })
-                    }}
-                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition cursor-pointer"
-                  >
-                    ⚡ Auto-Generate
-                  </button>
-                </div>
+                <label className="block font-semibold text-slate-700 mb-1">Direct Password Assignment *</label>
                 <input
-                  type="text"
+                  type="password"
                   required
                   value={newManager.password}
                   onChange={(e) => setNewManager({ ...newManager, password: e.target.value })}
-                  placeholder="e.g. Manager@1234"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs"
+                  placeholder="Minimum 6 characters"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  The Admin assigns this password. The manager will use this email & password to sign in to the Manager Portal.
-                </p>
               </div>
 
-              <div className="pt-3 flex items-center justify-end gap-3">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowAddManagerModal(false)}
-                  className="px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold transition cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-slate-500 hover:bg-slate-100 font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-md shadow-indigo-600/25 transition cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold transition shadow-xs cursor-pointer"
                 >
-                  Confirm & Create Manager
+                  Register Manager
                 </button>
               </div>
             </form>

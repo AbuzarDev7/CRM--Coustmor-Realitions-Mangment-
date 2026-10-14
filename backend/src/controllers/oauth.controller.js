@@ -11,7 +11,7 @@ const getBackendUrl = () => process.env.BACKEND_URL || "http://localhost:3000";
 const handleOAuthSuccess = (res, user) => {
   const displayName = user.name || (user.email ? user.email.split("@")[0] : "");
   const token = jwt.sign(
-    { userId: user._id, name: displayName, email: user.email, role: user.role },
+    { userId: user._id, name: displayName, email: user.email, role: user.role, avatar: user.avatar || "" },
     getJwtSecret(),
     { expiresIn: "7d" }
   );

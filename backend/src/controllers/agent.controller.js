@@ -3,17 +3,25 @@ import Deal from "../models/deal.model.js";
 import Activity from "../models/activity.model.js";
 import Notification from "../models/notification.model.js";
 import Staff from "../models/staff.model.js";
+import User from "../models/user.model.js";
 
 // GET /api/agent/dashboard
 // Fetch daily performance, assigned leads, follow-ups queue, and kanban deals for the agent
 export const getAgentDashboard = async (req, res) => {
   try {
-    const userEmail = req.user?.email || "";
+    const userEmail = (req.user?.email || "").toLowerCase().trim();
+    const userId = req.user?.userId || req.user?._id || req.user?.id;
+
+    let user = null;
+    if (userId) user = await User.findById(userId);
+    if (!user && userEmail) user = await User.findOne({ email: userEmail });
+
     // Dynamically look up the exact staff record created by Manager
-    const staff = userEmail ? await Staff.findOne({ email: userEmail.toLowerCase().trim() }) : null;
-    const finalName = staff?.name || req.user?.name || (userEmail ? userEmail.split('@')[0] : "Sales Agent");
-    const finalEmail = staff?.email || userEmail || "agent@onesoft.com";
-    const finalRole = staff?.role || "Sales Agent";
+    const staff = userEmail ? await Staff.findOne({ email: userEmail }) : null;
+    const finalName = staff?.name || user?.name || req.user?.name || (userEmail ? userEmail.split('@')[0] : "Sales Agent");
+    const finalEmail = staff?.email || user?.email || userEmail || "agent@onesoft.com";
+    const finalRole = staff?.role || user?.role || "Sales Agent";
+    const finalAvatar = user?.avatar || staff?.avatar || req.user?.avatar || "";
 
     // 1. Fetch Assigned Leads
     const leads = await Lead.find().sort({ updatedAt: -1 }).limit(15);
@@ -88,9 +96,12 @@ export const getAgentDashboard = async (req, res) => {
     return res.status(200).json({
       success: true,
       agent: {
+        id: user?._id || staff?._id,
+        _id: user?._id || staff?._id,
         name: finalName,
         email: finalEmail,
-        role: finalRole
+        role: finalRole,
+        avatar: finalAvatar
       },
       metrics: {
         totalLeads: totalLeadsCount,

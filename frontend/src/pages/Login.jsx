@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
+import { useAuth } from '../context/AuthContext'
 
 const Login = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const { login: authLogin } = useAuth()
   const [formData, setFormData] = useState({
     email: location.state?.email || '',
     password: ''
@@ -86,13 +88,8 @@ const Login = () => {
 
       setSuccess('Login successful! Redirecting to CRM dashboard...')
 
-      // Save token and user details in localStorage
-      if (data.token || data.accessToken) {
-        localStorage.setItem('crm_token', data.token || data.accessToken)
-      }
-      if (data.user) {
-        localStorage.setItem('crm_user', JSON.stringify(data.user))
-      }
+      // Save token and user details in AuthContext & localStorage
+      authLogin(data.token || data.accessToken, data.user)
 
       setTimeout(() => {
         const role = data.user?.role
@@ -100,6 +97,8 @@ const Login = () => {
           navigate('/manager-dashboard')
         } else if (role === 'agent' || role === 'staff') {
           navigate('/agent-dashboard')
+        } else if (role === 'customer' || role === 'client') {
+          navigate('/portal')
         } else {
           navigate('/dashboard')
         }

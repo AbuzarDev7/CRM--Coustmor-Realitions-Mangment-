@@ -60,6 +60,12 @@ const staffSchema = new mongoose.Schema(
       enum: ["manager", "agent", "staff"],
       default: "agent"
     },
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Company",
+      index: true,
+      default: null
+    },
     managerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"

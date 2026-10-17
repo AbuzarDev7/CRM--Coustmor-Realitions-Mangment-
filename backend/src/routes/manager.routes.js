@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  getManagerOverview,
   getManagerDashboard,
   getManagerAgents,
   addSalesAgentOrStaff,
@@ -7,30 +8,27 @@ import {
   assignLeadToAgent,
   handleApprovalAction
 } from "../controllers/manager.controller.js";
-import { getManagerChatReports, getFullTranscript } from "../controllers/chat.controller.js";
 import { optionalAuth } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
-// Apply optionalAuth to bind manager session details
 router.use(optionalAuth);
 
-// Manager Dashboard (Strictly essential metrics & team overview)
+// 1. Manager Real-time Overview & Dashboard
+router.get("/overview", getManagerOverview);
 router.get("/dashboard", getManagerDashboard);
 
-// Chat Audit Reports and Transcripts
-router.get("/chat-reports", getManagerChatReports);
-router.get("/reports", getManagerChatReports);
-router.get("/transcripts/:id", getFullTranscript);
-
-// Sales Agents and Staff Management (Manager permission)
+// 2. Sales Agents Management (Manager permission)
 router.get("/agents", getManagerAgents);
 router.post("/agents", addSalesAgentOrStaff);
 router.delete("/agents/:id", deleteSalesAgentOrStaff);
 
-// Lead Assignment Queue & Approvals
+// 3. Lead Assignment Queue
+router.put("/leads/:leadId/assign", assignLeadToAgent);
 router.patch("/leads/:leadId/assign", assignLeadToAgent);
-router.post("/approvals/:id/action", handleApprovalAction);
+
+// 4. Notifications & Approval Action
+router.post("/notifications/:id/approval", handleApprovalAction);
+router.patch("/notifications/:id/approval", handleApprovalAction);
 
 export default router;
-

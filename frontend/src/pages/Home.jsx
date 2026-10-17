@@ -1,8 +1,10 @@
-import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { LEADS_API_URL } from '../config/api'
 
 const Home = () => {
+  const navigate = useNavigate()
   const { user, isAuthenticated, logout } = useAuth()
   const [activeTab, setActiveTab] = useState('calendar')
   const [activeFaq, setActiveFaq] = useState(0)
@@ -10,13 +12,84 @@ const Home = () => {
   const [bottomEmail, setBottomEmail] = useState('')
   const [demoSubmitted, setDemoSubmitted] = useState(false)
 
+  // Real Estate Property Public Inquiry State (POST /api/leads/submit)
+  const [showInquiryModal, setShowInquiryModal] = useState(false)
+  const [inquiryForm, setInquiryForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    propertyType: 'Residential Apartment',
+    budget: '$500,000 - $1,000,000',
+    requirements: ''
+  })
+  const [inquirySubmitting, setInquirySubmitting] = useState(false)
+  const [inquirySuccess, setInquirySuccess] = useState('')
+  const [inquiryError, setInquiryError] = useState('')
+
+  // Seamlessly forward OAuth redirects (code/token/error) from root to /login
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('code') || params.get('token') || params.get('error')) {
+      navigate(`/login${window.location.search}`, { replace: true })
+    }
+  }, [navigate])
+
   const handleDemoSubmit = (e, emailVal) => {
     e.preventDefault()
     if (emailVal) {
-      setDemoSubmitted(true)
-      setTimeout(() => setDemoSubmitted(false), 4000)
+      setInquiryForm((prev) => ({ ...prev, email: emailVal }))
+      setShowInquiryModal(true)
     }
   }
+
+  const handleInquirySubmit = async (e) => {
+    e.preventDefault()
+    setInquirySubmitting(true)
+    setInquiryError('')
+    setInquirySuccess('')
+
+    try {
+      const res = await fetch(`${LEADS_API_URL}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName: inquiryForm.name,
+          email: inquiryForm.email,
+          phone: inquiryForm.phone,
+          propertyType: inquiryForm.propertyType,
+          budget: inquiryForm.budget,
+          requirements: inquiryForm.requirements,
+          message: `${inquiryForm.propertyType} (${inquiryForm.budget}): ${inquiryForm.requirements}`
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to submit property inquiry')
+      }
+
+      setInquirySuccess(data.message || 'Your property inquiry has been submitted! Our management team will assign a specialist shortly.')
+      setInquiryForm({
+        name: '',
+        email: '',
+        phone: '',
+        propertyType: 'Residential Apartment',
+        budget: '$500,000 - $1,000,000',
+        requirements: ''
+      })
+      setDemoSubmitted(true)
+      setTimeout(() => {
+        setShowInquiryModal(false)
+        setInquirySuccess('')
+      }, 2500)
+    } catch (err) {
+      setInquiryError(err.message || 'An error occurred while submitting inquiry.')
+    } finally {
+      setInquirySubmitting(false)
+    }
+  }
+
+
 
   const faqs = [
     {
@@ -76,8 +149,13 @@ const Home = () => {
                 Products <span className="text-xs opacity-75">▾</span>
               </a>
               <a href="#features" className="hover:text-white transition">Features</a>
+              <button
+                onClick={() => setShowInquiryModal(true)}
+                className="hover:text-white transition cursor-pointer font-medium"
+              >
+                Inquire
+              </button>
               <a href="#reviews" className="hover:text-white transition">Reviews</a>
-              <a href="#articles" className="hover:text-white transition">Blog</a>
               <a href="#faq" className="hover:text-white transition">FAQ</a>
             </div>
 
@@ -91,7 +169,7 @@ const Home = () => {
                     </div>
                     <span className="font-bold text-white max-w-[130px] truncate">{user.name || user.email?.split('@')[0]}</span>
                     <span className="text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded-full bg-white/30 text-white tracking-wider">
-                      {user.role || 'Member'}
+                      {user.role || 'Staff'}
                     </span>
                   </div>
 
@@ -101,8 +179,6 @@ const Home = () => {
                         ? '/manager-dashboard'
                         : user.role === 'agent' || user.role === 'staff'
                         ? '/agent-dashboard'
-                        : user.role === 'customer' || user.role === 'client'
-                        ? '/portal'
                         : '/dashboard'
                     }
                     className="bg-white text-violet-700 hover:bg-violet-50 text-xs font-bold px-4 py-2 rounded-full shadow-md shadow-purple-950/20 hover:scale-[1.02] transition-all cursor-pointer"
@@ -119,18 +195,17 @@ const Home = () => {
                 </>
               ) : (
                 <>
-                  <span className="text-white/70 text-xs font-medium hidden sm:inline">Guest</span>
+                  <button
+                    onClick={() => setShowInquiryModal(true)}
+                    className="text-white hover:text-violet-200 text-xs font-bold px-3 py-1.5 transition cursor-pointer hidden sm:inline"
+                  >
+                    Contact Us
+                  </button>
                   <Link
                     to="/login"
-                    className="text-white/90 hover:text-white text-sm font-medium px-3 py-1.5 transition"
+                    className="bg-white text-violet-700 hover:bg-violet-50 text-xs font-bold px-4 py-2 rounded-full shadow-md shadow-purple-950/20 hover:scale-[1.02] transition-all cursor-pointer"
                   >
-                    Sign In
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="bg-white text-violet-700 hover:bg-violet-50 text-sm font-semibold px-5 py-2 rounded-full shadow-md shadow-purple-950/20 hover:scale-[1.02] transition-all cursor-pointer"
-                  >
-                    Register
+                    Staff Sign In &rarr;
                   </Link>
                 </>
               )}
@@ -139,13 +214,17 @@ const Home = () => {
 
           {/* HERO CONTENT */}
           <div className="text-center max-w-3xl mx-auto pt-4 pb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold mb-4 backdrop-blur-md">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              Real Estate Property CRM & Client Acquisition
+            </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.15] drop-shadow-sm mb-6">
-              Boost Business <br />
-              <span className="text-white/95">All-in-One Software</span>
+              Prime Properties, <br />
+              <span className="text-white/95">Seamless Management</span>
             </h1>
             
             <p className="text-white/85 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed mb-10">
-              Boost your business with our integrated software, combining essential tools into one powerful platform for greater efficiency.
+              Find luxury residential residences, commercial developments, and investment plots. Submit your requirements and let our certified property specialists guide your transaction.
             </p>
 
             {/* HERO CTA PILL INPUT */}
@@ -806,6 +885,146 @@ const Home = () => {
       </section>
 
       {/* =========================================================================
+          SECTION 4.5: PUBLIC INQUIRY SUBMISSION SECTION (DIRECT ROUTE TO MANAGER DASHBOARD)
+          ========================================================================= */}
+      <section id="inquire" className="py-20 bg-gradient-to-b from-white via-slate-50 to-white border-t border-slate-100">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-10">
+            <span className="inline-block px-3.5 py-1 rounded-full text-xs font-bold tracking-wider uppercase bg-violet-100 text-violet-700 mb-3">
+              Property Inquiries
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+              Inquire About Premium Properties
+            </h2>
+            <p className="text-sm text-slate-500 mt-2">
+              Looking for a villa, penthouse, apartment, or commercial space? Submit your requirements below. Our Management Team assigns an expert agent to your request immediately.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200/80 shadow-xl shadow-purple-900/5 max-w-2xl mx-auto">
+            {inquirySuccess && (
+              <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl font-medium flex items-center gap-3 text-xs animate-fade-in">
+                <svg className="w-5 h-5 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>{inquirySuccess}</span>
+              </div>
+            )}
+
+            {inquiryError && (
+              <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl font-medium flex items-center gap-3 text-xs animate-fade-in">
+                <svg className="w-5 h-5 text-rose-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <span>{inquiryError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleInquirySubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  autoComplete="name"
+                  value={inquiryForm.name}
+                  onChange={(e) => setInquiryForm({ ...inquiryForm, name: e.target.value })}
+                  placeholder="e.g. Sarah Jenkins"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 text-xs transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1.5">Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={inquiryForm.email}
+                    onChange={(e) => setInquiryForm({ ...inquiryForm, email: e.target.value })}
+                    placeholder="sarah@example.com"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 text-xs transition"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1.5">Phone Number *</label>
+                  <input
+                    type="tel"
+                    required
+                    autoComplete="tel"
+                    value={inquiryForm.phone}
+                    onChange={(e) => setInquiryForm({ ...inquiryForm, phone: e.target.value })}
+                    placeholder="+1 (555) 234-5678"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 text-xs transition"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1.5">Property Type *</label>
+                  <select
+                    value={inquiryForm.propertyType}
+                    onChange={(e) => setInquiryForm({ ...inquiryForm, propertyType: e.target.value })}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 text-xs transition cursor-pointer"
+                  >
+                    <option value="Residential Apartment">Residential Apartment</option>
+                    <option value="Luxury Villa">Luxury Villa</option>
+                    <option value="Commercial Space">Commercial Space</option>
+                    <option value="Penthouse / Duplex">Penthouse / Duplex</option>
+                    <option value="Land / Plot">Land / Plot</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1.5">Budget Range *</label>
+                  <select
+                    value={inquiryForm.budget}
+                    onChange={(e) => setInquiryForm({ ...inquiryForm, budget: e.target.value })}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 text-xs transition cursor-pointer"
+                  >
+                    <option value="< $300,000">&lt; $300,000</option>
+                    <option value="$300,000 - $600,000">$300,000 - $600,000</option>
+                    <option value="$600,000 - $1,500,000">$600,000 - $1,500,000</option>
+                    <option value="$1,500,000 - $3,000,000">$1,500,000 - $3,000,000</option>
+                    <option value="$3,000,000+">$3,000,000+</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">Property Requirements & Preferences *</label>
+                <textarea
+                  rows={4}
+                  required
+                  value={inquiryForm.requirements}
+                  onChange={(e) => setInquiryForm({ ...inquiryForm, requirements: e.target.value })}
+                  placeholder="e.g. Looking for a 3-bedroom apartment with balcony, parking, and close proximity to downtown..."
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 text-xs transition"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={inquirySubmitting}
+                  className="w-full py-3.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-bold text-sm shadow-lg shadow-violet-600/25 transition cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {inquirySubmitting && (
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                  )}
+                  <span>{inquirySubmitting ? 'Submitting to Manager...' : 'Submit Property Inquiry'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
           SECTION 5: FAQ ACCORDION (MATCHING IMAGE DESIGN)
           ========================================================================= */}
       <section id="faq" className="py-20 bg-slate-50/70 border-t border-slate-200/60">
@@ -899,7 +1118,7 @@ const Home = () => {
             </button>
           </form>
 
-          <div className="flex flex-wrap justify-center items-center gap-3 sm:gap-6 text-xs text-white/70 pt-2 font-medium">
+          <div className="flex justify-center items-center gap-6 text-xs text-white/70 pt-2 font-medium">
             <span>✓ 14-Day Free Trial</span>
             <span>✓ No Credit Card Required</span>
             <span>✓ Instant Onboarding</span>
@@ -923,10 +1142,9 @@ const Home = () => {
           <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-medium">
             <a href="#solutions" className="hover:text-white transition">Products</a>
             <a href="#features" className="hover:text-white transition">Features</a>
-            <a href="#reviews" className="hover:text-white transition">Reviews</a>
+            <a href="#inquire" className="hover:text-white transition">Inquire</a>
             <a href="#faq" className="hover:text-white transition">FAQ</a>
-            <Link to="/login" className="hover:text-white transition">Sign In</Link>
-            <Link to="/register" className="text-violet-400 hover:text-violet-300 transition">Register</Link>
+            <Link to="/login" className="hover:text-white transition">Staff Sign In</Link>
           </div>
 
           <p className="text-slate-500">
@@ -934,6 +1152,156 @@ const Home = () => {
           </p>
         </div>
       </footer>
+
+      {/* =========================================================================
+          PUBLIC CUSTOMER INQUIRY SUBMISSION MODAL (POST /api/leads/submit)
+          ========================================================================= */}
+      {showInquiryModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden animate-scale-up">
+            <div className="px-6 py-5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-lg tracking-tight">Submit Property Inquiry</h3>
+                <p className="text-xs text-white/80 mt-0.5">Your inquiry is routed directly to our Manager Dashboard for immediate agent assignment</p>
+              </div>
+              <button
+                onClick={() => setShowInquiryModal(false)}
+                className="p-1.5 rounded-full text-white/80 hover:text-white hover:bg-white/20 transition cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleInquirySubmit} className="p-6 space-y-4 text-xs">
+              {inquirySuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl font-medium flex items-center gap-2">
+                  <svg className="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span>{inquirySuccess}</span>
+                </div>
+              )}
+
+              {inquiryError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl font-medium flex items-center gap-2">
+                  <svg className="w-4 h-4 text-rose-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <span>{inquiryError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  autoComplete="name"
+                  value={inquiryForm.name}
+                  onChange={(e) => setInquiryForm({ ...inquiryForm, name: e.target.value })}
+                  placeholder="e.g. John Doe"
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 text-xs transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={inquiryForm.email}
+                    onChange={(e) => setInquiryForm({ ...inquiryForm, email: e.target.value })}
+                    placeholder="john@example.com"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 text-xs transition"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Phone Number *</label>
+                  <input
+                    type="tel"
+                    required
+                    autoComplete="tel"
+                    value={inquiryForm.phone}
+                    onChange={(e) => setInquiryForm({ ...inquiryForm, phone: e.target.value })}
+                    placeholder="+1 (555) 000-0000"
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 text-xs transition"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Property Type *</label>
+                  <select
+                    value={inquiryForm.propertyType}
+                    onChange={(e) => setInquiryForm({ ...inquiryForm, propertyType: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 text-xs transition cursor-pointer"
+                  >
+                    <option value="Residential Apartment">Residential Apartment</option>
+                    <option value="Luxury Villa">Luxury Villa</option>
+                    <option value="Commercial Space">Commercial Space</option>
+                    <option value="Penthouse / Duplex">Penthouse / Duplex</option>
+                    <option value="Land / Plot">Land / Plot</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Budget Range *</label>
+                  <select
+                    value={inquiryForm.budget}
+                    onChange={(e) => setInquiryForm({ ...inquiryForm, budget: e.target.value })}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 text-xs transition cursor-pointer"
+                  >
+                    <option value="< $300,000">&lt; $300,000</option>
+                    <option value="$300,000 - $600,000">$300,000 - $600,000</option>
+                    <option value="$600,000 - $1,500,000">$600,000 - $1,500,000</option>
+                    <option value="$1,500,000 - $3,000,000">$1,500,000 - $3,000,000</option>
+                    <option value="$3,000,000+">$3,000,000+</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Property Requirements & Budget Notes *</label>
+                <textarea
+                  rows={4}
+                  required
+                  value={inquiryForm.requirements}
+                  onChange={(e) => setInquiryForm({ ...inquiryForm, requirements: e.target.value })}
+                  placeholder="Describe your desired property, preferred location, layout, or amenities..."
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 text-xs transition"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowInquiryModal(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-medium transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={inquirySubmitting}
+                  className="px-6 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-bold shadow-md shadow-violet-600/20 transition cursor-pointer flex items-center gap-2"
+                >
+                  {inquirySubmitting && (
+                    <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                  )}
+                  <span>{inquirySubmitting ? 'Submitting...' : 'Submit Inquiry'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   )

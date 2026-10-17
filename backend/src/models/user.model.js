@@ -39,18 +39,40 @@ const userSchema = new mongoose.Schema(
     },
     isVerified: {
       type: Boolean,
-      default: false
+      default: true
     },
     role: {
       type: String,
-      enum: ["superadmin", "admin", "manager", "staff", "agent", "sales_agent", "engineer", "customer", "custmor", "user"],
-      default: "customer",
+      enum: ["superadmin", "company_admin", "manager", "agent"],
+      default: "agent",
       lowercase: true,
       trim: true
+    },
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Company",
+      default: null,
+      index: true
     }
   },
   { timestamps: true }
 );
+
+// Pre-validation hook to normalize role strictly to SaaS role hierarchy
+userSchema.pre("validate", function () {
+  if (this.role) {
+    const r = this.role.toLowerCase().trim();
+    if (r === "admin" || r === "superadmin" || r === "root" || r === "engineer") {
+      this.role = "superadmin";
+    } else if (r === "company_admin" || r === "companyadmin" || r === "owner") {
+      this.role = "company_admin";
+    } else if (r === "manager") {
+      this.role = "manager";
+    } else {
+      this.role = "agent";
+    }
+  }
+});
 
 export const User = mongoose.model("User", userSchema);
 export default User;

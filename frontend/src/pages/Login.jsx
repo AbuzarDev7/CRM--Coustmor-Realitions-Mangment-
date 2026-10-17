@@ -22,23 +22,21 @@ const Login = () => {
     const token = params.get('token')
     const email = params.get('email')
     const name = params.get('name')
-    const role = params.get('role')
+    const role = (params.get('role') || 'customer').toLowerCase().trim()
     const oauthError = params.get('error')
+    const code = params.get('code')
 
     if (oauthError) {
-      setError(oauthError)
+      setError(decodeURIComponent(oauthError))
       window.history.replaceState({}, document.title, window.location.pathname)
     } else if (token) {
-      localStorage.setItem('crm_token', token)
-      localStorage.setItem(
-        'crm_user',
-        JSON.stringify({
-          email: email || '',
-          name: name || '',
-          role: role || 'customer'
-        })
-      )
-      setSuccess('Signed in successfully! Redirecting to CRM dashboard...')
+      const userData = {
+        email: email || '',
+        name: name || '',
+        role: role || 'customer'
+      }
+      authLogin(token, userData)
+      setSuccess('Signed in successfully! Redirecting...')
       window.history.replaceState({}, document.title, window.location.pathname)
       setTimeout(() => {
         if (role === 'manager') {
@@ -48,9 +46,41 @@ const Login = () => {
         } else {
           navigate('/dashboard')
         }
-      }, 1000)
+      }, 700)
+    } else if (code) {
+      setLoading(true)
+      setSuccess('Completing authentication with provider...')
+      window.history.replaceState({}, document.title, window.location.pathname)
+
+      fetch(`${API_BASE_URL}/github/callback?code=${encodeURIComponent(code)}`, {
+        headers: { Accept: 'application/json' }
+      })
+        .then(async (res) => {
+          const data = await res.json()
+          if (!res.ok || !data.token) {
+            throw new Error(data.error || 'Authentication with GitHub failed.')
+          }
+          authLogin(data.token, data.user)
+          setSuccess('Signed in successfully! Redirecting...')
+          setTimeout(() => {
+            const userRole = (data.user?.role || 'agent').toLowerCase().trim()
+            if (userRole === 'manager') {
+              navigate('/manager-dashboard')
+            } else if (userRole === 'agent' || userRole === 'staff') {
+              navigate('/agent-dashboard')
+            } else {
+              navigate('/dashboard')
+            }
+          }, 700)
+        })
+        .catch((err) => {
+          setError(err.message || 'OAuth authentication failed.')
+        })
+        .finally(() => {
+          setLoading(false)
+        })
     }
-  }, [navigate])
+  }, [navigate, authLogin])
 
   const handleChange = (e) => {
     setFormData({
@@ -92,17 +122,15 @@ const Login = () => {
       authLogin(data.token || data.accessToken, data.user)
 
       setTimeout(() => {
-        const role = data.user?.role
+        const role = (data.user?.role || 'agent').toLowerCase().trim()
         if (role === 'manager') {
           navigate('/manager-dashboard')
         } else if (role === 'agent' || role === 'staff') {
           navigate('/agent-dashboard')
-        } else if (role === 'customer' || role === 'client') {
-          navigate('/portal')
         } else {
           navigate('/dashboard')
         }
-      }, 1000)
+      }, 700)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -120,8 +148,8 @@ const Login = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Welcome Back</h1>
-          <p className="text-sm text-slate-400 mt-1">Sign in to your CRM portal</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Staff Portal Sign In</h1>
+          <p className="text-sm text-slate-400 mt-1">Superadmin, Manager & Agent Authentication</p>
         </div>
 
         {/* Feedback Alerts */}
@@ -241,6 +269,20 @@ const Login = () => {
             </div>
           </div>
 
+          {/* Quick Demo Credentials */}
+          <div className="pt-1 pb-1">
+            <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
+              <span>Quick Login:</span>
+              <button
+                type="button"
+                onClick={() => setFormData({ email: 'admin@crm.com', password: 'Admin@1234' })}
+                className="text-violet-400 hover:text-violet-300 font-semibold cursor-pointer underline transition"
+              >
+                Superadmin (admin@crm.com)
+              </button>
+            </div>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
@@ -261,11 +303,16 @@ const Login = () => {
         </form>
 
         {/* Footer */}
-        <div className="mt-6 text-center text-sm text-slate-400">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-blue-400 hover:text-blue-300 font-medium transition">
-            Create account
-          </Link>
+        <div className="mt-6 text-center text-xs text-slate-400 border-t border-slate-700/60 pt-4 space-y-2">
+          <p>
+            Client or prospect? Submit inquiries via our{' '}
+            <Link to="/" className="text-blue-400 hover:text-blue-300 font-semibold transition">
+              Public Home Form
+            </Link>
+          </p>
+          <p className="text-slate-500 text-[11px]">
+            Staff accounts are provisioned exclusively by Superadmins and Managers.
+          </p>
         </div>
       </div>
     </div>

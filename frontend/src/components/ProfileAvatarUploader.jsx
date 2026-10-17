@@ -127,7 +127,7 @@ const ProfileAvatarUploader = ({
   }
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-7 shadow-xs space-y-6">
+    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
         <div>
           <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -157,7 +157,7 @@ const ProfileAvatarUploader = ({
       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
         {/* Avatar Display Frame */}
         <div className="relative group shrink-0">
-          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden border-2 border-slate-200 shadow-md bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white font-extrabold text-2xl tracking-wider ring-4 ring-slate-100">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border-2 border-slate-200 shadow-sm bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white font-extrabold text-2xl tracking-wider ring-4 ring-slate-100">
             {avatar ? (
               <img
                 src={avatar}
@@ -177,9 +177,9 @@ const ProfileAvatarUploader = ({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             title="Upload photo from device"
-            className="absolute -bottom-1.5 -right-1.5 w-9 h-9 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white flex items-center justify-center shadow-lg shadow-violet-600/30 transition hover:scale-110 cursor-pointer border-2 border-white"
+            className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-xl bg-violet-600 hover:bg-violet-700 text-white flex items-center justify-center shadow-md shadow-violet-600/30 transition hover:scale-110 cursor-pointer border-2 border-white"
           >
-            <Camera className="w-4 h-4" />
+            <Camera className="w-3.5 h-3.5" />
           </button>
         </div>
 
@@ -209,7 +209,7 @@ const ProfileAvatarUploader = ({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shadow-md shadow-violet-600/20 transition cursor-pointer hover:scale-[1.02]"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shadow-xs shadow-violet-600/20 transition cursor-pointer hover:scale-[1.01]"
             >
               <Upload className="w-3.5 h-3.5" />
               <span>Upload from Device</span>
@@ -227,18 +227,18 @@ const ProfileAvatarUploader = ({
 
           {/* URL Input Dropdown Form */}
           {showUrlField && (
-            <form onSubmit={handleApplyUrl} className="flex items-center gap-2 pt-1 animate-fade-in">
+            <form onSubmit={handleApplyUrl} className="flex items-center gap-2 pt-1 animate-fade-in max-w-md">
               <input
                 type="url"
                 required
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="https://example.com/photo.jpg"
-                className="flex-1 px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/20 font-mono"
+                className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/20 font-mono"
               />
               <button
                 type="submit"
-                className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition cursor-pointer shrink-0"
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition cursor-pointer shrink-0"
               >
                 Apply
               </button>
@@ -265,9 +265,9 @@ const ProfileAvatarUploader = ({
                 key={preset.id}
                 type="button"
                 onClick={() => handleSelectPreset(preset.url)}
-                className={`relative rounded-2xl p-1 transition cursor-pointer group hover:scale-105 ${
+                className={`relative rounded-xl p-1 transition cursor-pointer group hover:scale-105 ${
                   isSelected
-                    ? 'ring-3 ring-violet-600 bg-violet-50 shadow-md'
+                    ? 'ring-2 ring-violet-600 bg-violet-50 shadow-xs'
                     : 'hover:bg-slate-100 ring-1 ring-slate-200/60'
                 }`}
                 title={preset.label}
@@ -275,7 +275,7 @@ const ProfileAvatarUploader = ({
                 <img
                   src={preset.url}
                   alt={preset.label}
-                  className="w-12 h-12 rounded-xl object-cover"
+                  className="w-12 h-12 rounded-lg object-cover"
                 />
                 {isSelected && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-violet-600 text-white flex items-center justify-center text-[10px] font-bold shadow-xs">

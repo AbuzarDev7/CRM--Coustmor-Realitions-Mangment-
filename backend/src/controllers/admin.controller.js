@@ -6,35 +6,94 @@ import Notification from "../models/notification.model.js";
 import User from "../models/user.model.js";
 import bcrypt from "bcrypt";
 
-// Monthly revenue chart static base data blended with live totals
-const monthlyRevenueBaseline = [
-  { month: "Jan", revenue: 42000, target: 35000, deals: 32 },
-  { month: "Feb", revenue: 56000, target: 45000, deals: 44 },
-  { month: "Mar", revenue: 51000, target: 48000, deals: 39 },
-  { month: "Apr", revenue: 68000, target: 58000, deals: 52 },
-  { month: "May", revenue: 79000, target: 65000, deals: 61 },
-  { month: "Jun", revenue: 74000, target: 70000, deals: 58 },
-  { month: "Jul", revenue: 89000, target: 75000, deals: 71 },
-  { month: "Aug", revenue: 98000, target: 82000, deals: 77 },
-  { month: "Sep", revenue: 112000, target: 90000, deals: 84 },
-  { month: "Oct", revenue: 128450, target: 95000, deals: 96 }
-];
+export const getAdminOverview = async (req, res) => {
+  try {
+    const totalLeads = await Lead.countDocuments();
+    const unassignedLeads = await Lead.countDocuments({
+      $or: [
+        { assignedAgent: null },
+        { assignedAgent: { $exists: false } },
+        { status: "New" }
+      ]
+    });
+    const assignedLeads = Math.max(0, totalLeads - unassignedLeads);
+
+    const totalManagers = await Staff.countDocuments({ category: "manager" });
+    const totalAgents = await Staff.countDocuments({ category: { $ne: "manager" } });
+
+    const newLeads = await Lead.countDocuments({ status: "New" });
+    const inProgressLeads = await Lead.countDocuments({
+      status: { $in: ["Contacted", "In Progress", "Site Visit Scheduled"] }
+    });
+    const siteVisitsScheduled = await Lead.countDocuments({ status: "Site Visit Scheduled" });
+    const dealsClosed = await Lead.countDocuments({
+      status: { $in: ["Deal Closed", "Closed"] }
+    });
+
+    const leadStatusDistribution = [
+      { name: "New Leads", count: newLeads, fill: "#8b5cf6" },
+      { name: "In Progress", count: inProgressLeads, fill: "#3b82f6" },
+      { name: "Site Visits", count: siteVisitsScheduled, fill: "#f59e0b" },
+      { name: "Deals Closed", count: dealsClosed, fill: "#10b981" }
+    ];
+
+    let managers = [];
+    const staffQuery = Staff.find({ category: "manager" });
+    if (staffQuery && typeof staffQuery.sort === "function") {
+      managers = (await staffQuery.sort({ createdAt: -1 })) || [];
+    } else if (staffQuery) {
+      managers = (await staffQuery) || [];
+    }
+
+    let recentLeads = [];
+    const leadQuery = Lead.find();
+    if (leadQuery && typeof leadQuery.populate === "function") {
+      const populated = leadQuery.populate("assignedAgent", "name email role avatar");
+      recentLeads =
+        populated && typeof populated.sort === "function"
+          ? (await populated.sort({ createdAt: -1 }).limit(20)) || []
+          : (await populated) || [];
+    } else if (leadQuery && typeof leadQuery.sort === "function") {
+      recentLeads = (await leadQuery.sort({ createdAt: -1 }).limit(20)) || [];
+    } else if (leadQuery) {
+      recentLeads = (await leadQuery) || [];
+    }
+
+    return res.status(200).json({
+      success: true,
+      stats: {
+        totalLeads,
+        unassignedLeads,
+        assignedLeads,
+        totalManagers,
+        totalAgents,
+        newLeads,
+        inProgressLeads,
+        siteVisitsScheduled,
+        dealsClosed
+      },
+      leadStatusDistribution,
+      managers,
+      recentLeads
+    });
+  } catch (error) {
+    console.error("Admin Overview Error:", error);
+    return res.status(500).json({ error: "Failed to fetch admin overview statistics" });
+  }
+};
 
 export const getDashboardStats = async (req, res) => {
   try {
-    // 1. Fetch live metrics from DB collections
-    const totalStaffCount = await Staff.countDocuments();
-    const liveLeadsCount = await Lead.countDocuments();
-    const liveDealsCount = await Deal.countDocuments();
-    
-    // Aggregation for closed deals revenue
+    const totalStaffCount = (await Staff.countDocuments().catch(() => 0)) || 0;
+    const liveLeadsCount = (await Lead.countDocuments().catch(() => 0)) || 0;
+    const liveDealsCount = (await Deal.countDocuments().catch(() => 0)) || 0;
+
     const wonDealsAgg = await Deal.aggregate([
       { $match: { stage: "Closed Won" } },
       { $group: { _id: null, total: { $sum: "$amount" } } }
-    ]);
-    const liveWonDealsSum = wonDealsAgg[0]?.total || 0;
+    ]).catch(() => []);
+    const liveWonDealsSum = (Array.isArray(wonDealsAgg) && wonDealsAgg[0]?.total) || 0;
 
-    // Staff total closed value aggregation
     const staffAgg = await Staff.aggregate([
       {
         $group: {
@@ -44,49 +103,53 @@ export const getDashboardStats = async (req, res) => {
           avgSuccessRate: { $avg: "$successRate" }
         }
       }
-    ]);
-    const staffTotalClosed = staffAgg[0]?.totalValue || 0;
+    ]).catch(() => []);
+    const staffTotalClosed = (Array.isArray(staffAgg) && staffAgg[0]?.totalValue) || 0;
 
-    // Baseline numbers with live adjustments
-    const totalRevenue = 128450 + liveWonDealsSum;
-    const totalLeads = 1420 + liveLeadsCount;
-    const activeDeals = 86 + liveDealsCount;
+    const totalRevenue = liveWonDealsSum;
+    const totalLeads = liveLeadsCount;
+    const activeDeals = liveDealsCount;
     const conversionRate = 24.8;
 
-    // Lead Sources Aggregation
     const sourceBreakdown = await Lead.aggregate([
       { $group: { _id: "$source", count: { $sum: 1 } } }
-    ]);
+    ]).catch(() => []);
 
-    // Build source map
     const defaultLeadSources = [
-      { name: "Organic Website", value: 596, color: "#7c3aed" },
-      { name: "Facebook & Social Ads", value: 398, color: "#38bdf8" },
-      { name: "Client Referrals", value: 255, color: "#10b981" },
-      { name: "Cold Outreach & Email", value: 171, color: "#f59e0b" }
+      { name: "Organic Website", value: 0, color: "#7c3aed" },
+      { name: "Facebook & Social Ads", value: 0, color: "#38bdf8" },
+      { name: "Client Referrals", value: 0, color: "#10b981" },
+      { name: "Cold Outreach & Email", value: 0, color: "#f59e0b" }
     ];
 
-    sourceBreakdown.forEach((item) => {
-      const found = defaultLeadSources.find((s) => s.name === item._id);
-      if (found) {
-        found.value += item.count;
-      } else if (item._id) {
-        defaultLeadSources.push({
-          name: item._id,
-          value: item.count,
-          color:
-            item._id === "Instagram"
-              ? "#ec4899"
-              : item._id === "Facebook"
-              ? "#3b82f6"
-              : item._id === "LinkedIn"
-              ? "#0ea5e9"
-              : item._id === "WhatsApp"
-              ? "#10b981"
-              : "#6366f1"
-        });
-      }
-    });
+    if (Array.isArray(sourceBreakdown)) {
+      sourceBreakdown.forEach((item) => {
+        if (!item?._id) return;
+        const found = defaultLeadSources.find((s) => s.name === item._id);
+        if (found) {
+          found.value = item.count;
+        } else {
+          defaultLeadSources.push({
+            name: item._id,
+            value: item.count,
+            color: "#6366f1"
+          });
+        }
+      });
+    }
+
+    const monthlyRevenueBaseline = [
+      { month: "Jan", revenue: 42000, target: 35000, deals: 32 },
+      { month: "Feb", revenue: 56000, target: 45000, deals: 44 },
+      { month: "Mar", revenue: 51000, target: 48000, deals: 39 },
+      { month: "Apr", revenue: 68000, target: 58000, deals: 52 },
+      { month: "May", revenue: 79000, target: 65000, deals: 61 },
+      { month: "Jun", revenue: 74000, target: 70000, deals: 58 },
+      { month: "Jul", revenue: 89000, target: 75000, deals: 71 },
+      { month: "Aug", revenue: 98000, target: 82000, deals: 77 },
+      { month: "Sep", revenue: 112000, target: 90000, deals: 84 },
+      { month: "Oct", revenue: 128450, target: 95000, deals: 96 }
+    ];
 
     return res.status(200).json({
       success: true,
@@ -106,7 +169,7 @@ export const getDashboardStats = async (req, res) => {
         activeDeals: {
           raw: activeDeals,
           formatted: `${activeDeals} deals`,
-          label: "14 due this week"
+          label: "active in pipeline"
         },
         conversionRate: {
           raw: conversionRate,
@@ -115,12 +178,12 @@ export const getDashboardStats = async (req, res) => {
           label: "overall win rate"
         }
       },
-      revenueGrowth: monthlyRevenueBaseline,
-      leadSources: defaultLeadSources,
       summary: {
         totalStaff: totalStaffCount,
         staffClosedValue: staffTotalClosed
-      }
+      },
+      revenueGrowth: monthlyRevenueBaseline,
+      leadSources: defaultLeadSources
     });
   } catch (error) {
     console.error("Dashboard Stats Error:", error);
@@ -256,6 +319,33 @@ export const getManagers = async (req, res) => {
   }
 };
 
+export const deleteManager = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await Staff.findByIdAndDelete(id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Manager not found" });
+    }
+
+    if (deleted.email) {
+      await User.findOneAndDelete({ email: deleted.email.toLowerCase().trim() }).catch(() => {});
+    }
+
+    await Activity.create({
+      title: `Manager removed: ${deleted.name}`,
+      description: `Manager profile (${deleted.email}) was removed by Super Admin.`,
+      type: "staff",
+      user: req.user?.email || "Super Admin",
+      timeAgo: "Just now"
+    }).catch(() => {});
+
+    return res.status(200).json({ success: true, message: "Manager removed successfully" });
+  } catch (error) {
+    console.error("Delete Manager Error:", error);
+    return res.status(500).json({ error: "Failed to delete manager" });
+  }
+};
+
 // Activities Controller Endpoints
 export const getActivities = async (req, res) => {
   try {
@@ -322,27 +412,71 @@ export const getLeads = async (req, res) => {
 
 export const createLead = async (req, res) => {
   try {
-    const { name, email, phone, company, source, estimatedValue, notes } = req.body;
-    if (!name || !email) {
+    const {
+      name,
+      clientName,
+      email,
+      phone,
+      requirements,
+      message,
+      budget,
+      propertyType = "Residential",
+      company,
+      source = "Direct Call",
+      estimatedValue = 0,
+      notes,
+      note,
+      assignedAgent,
+      agentId,
+      status = "New"
+    } = req.body;
+
+    const resolvedName = (clientName || name || "").trim();
+    const resolvedEmail = (email || "").toLowerCase().trim();
+    const resolvedRequirements = (requirements || message || "").trim();
+
+    if (!resolvedName || !resolvedEmail) {
       return res.status(400).json({ error: "Name and email are required for a lead" });
     }
+
+    let resolvedAgentId = null;
+    const targetAgentId = assignedAgent || agentId;
+    if (targetAgentId && targetAgentId !== "unassigned") {
+      if (mongoose.Types.ObjectId.isValid(targetAgentId)) {
+        resolvedAgentId = targetAgentId;
+      }
+    }
+
+    const initialNotes = [];
+    const noteText = (typeof note === "string" ? note : (notes || "")).trim();
+    if (noteText) {
+      initialNotes.push({ text: noteText, date: new Date() });
+    }
+
     const lead = await Lead.create({
-      name,
-      email,
+      clientName: resolvedName,
+      name: resolvedName,
+      email: resolvedEmail,
       phone: phone || "",
-      company: company || "Individual",
-      source: source || "Organic Website",
+      requirements: resolvedRequirements,
+      message: resolvedRequirements,
+      budget: budget || "",
+      propertyType: propertyType || "Residential",
+      company: company || "Individual Client",
+      source: source || "Direct Call",
+      status: status || "New",
+      assignedAgent: resolvedAgentId,
       estimatedValue: Number(estimatedValue) || 0,
-      notes: notes || ""
+      notes: initialNotes
     });
 
     await Activity.create({
-      title: `New lead created: ${lead.name}`,
+      title: `New lead created: ${lead.clientName}`,
       description: `${lead.company} (${lead.source}) - Est. Value $${lead.estimatedValue.toLocaleString()}`,
       type: "lead",
       user: req.user?.email || "Admin",
       timeAgo: "Just now"
-    });
+    }).catch(() => {});
 
     return res.status(201).json({ success: true, lead });
   } catch (error) {

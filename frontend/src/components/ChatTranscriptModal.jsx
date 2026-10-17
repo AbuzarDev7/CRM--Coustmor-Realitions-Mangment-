@@ -55,7 +55,7 @@ const ChatTranscriptModal = ({ isOpen, onClose, conversationId }) => {
 
     // Real-Time Socket Connection to listen for new messages live
     const socket = io(SOCKET_URL, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       withCredentials: true
     })
 

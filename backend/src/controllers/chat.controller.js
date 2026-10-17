@@ -140,14 +140,20 @@ export const getConversationMessages = async (req, res) => {
 export const getAgentQueue = async (req, res) => {
   try {
     const agentEmail = req.query.agentEmail || req.user?.email || "";
+    const userRole = req.user?.role ? String(req.user.role).toLowerCase() : "";
 
     let query = {};
-    if (agentEmail) {
+    if (userRole === "admin" || userRole === "manager" || userRole === "superadmin") {
+      // Admins and Managers have root oversight over all conversations
+      query = {};
+    } else if (agentEmail) {
+      // For agents: show chats assigned to them, unassigned chats, or any active customer chats
       query = {
         $or: [
           { agentEmail: agentEmail.toLowerCase().trim() },
           { agentEmail: "" },
-          { agentEmail: { $exists: false } }
+          { agentEmail: { $exists: false } },
+          { status: "active" }
         ]
       };
     }
@@ -156,8 +162,7 @@ export const getAgentQueue = async (req, res) => {
       .sort({ lastMessageAt: -1, createdAt: -1 })
       .limit(50);
 
-    // If no conversations found for this specific agent email, load all active conversations
-    // so incoming customer chats are never hidden from team agents!
+    // If no conversations found under specific query, fallback to all active conversations
     if (conversations.length === 0) {
       conversations = await Conversation.find({})
         .sort({ lastMessageAt: -1, createdAt: -1 })

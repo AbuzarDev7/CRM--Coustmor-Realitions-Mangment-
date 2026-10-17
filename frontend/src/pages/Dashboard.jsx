@@ -1,135 +1,129 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  Search,
-  Bell,
-  Settings,
-  Calendar,
-  ChevronDown,
-  ArrowUpRight,
-  ArrowRight,
-  Check,
-  X,
-  User,
   Users,
   Plus,
   LogOut,
   Layers,
-  Eye,
   Sparkles,
+  X,
+  Trash2,
+  Building,
+  Mail,
+  Phone,
+  CheckCircle,
+  Clock,
+  LayoutDashboard,
+  ShieldCheck,
+  Search,
   TrendingUp,
+  BarChart3,
+  Settings,
+  UserCheck,
   FileText,
-  LayoutDashboard
+  Filter,
+  Eye
 } from 'lucide-react'
 import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
   XAxis,
   YAxis,
+  Tooltip,
+  Cell,
   CartesianGrid
 } from 'recharts'
-import { API_BASE_URL, ADMIN_API_URL } from '../config/api'
+import { ADMIN_API_URL, COMPANIES_API_URL } from '../config/api'
 import { useAuth } from '../context/AuthContext'
-import LeadAnalyticsWidget from '../components/LeadAnalyticsWidget'
-import AdminReportsWidget from '../components/AdminReportsWidget'
+import ManualLeadModal from '../components/ManualLeadModal'
 import AdminSettingsWidget from '../components/AdminSettingsWidget'
+import CreateCompanyModal from '../components/CreateCompanyModal'
+import EditCompanyModal from '../components/EditCompanyModal'
 
-// CRM Lead Acquisition Channels matching the Donut Chart slices (28%, 25%, 20%, 15%, 12%)
-const crmLeadChannelsData = [
-  { name: 'Facebook & Social Ads', value: 28, color: '#1877F2' },
-  { name: 'Instagram Leadgen', value: 25, color: '#E4405F' },
-  { name: 'LinkedIn Outreach', value: 20, color: '#0A66C2' },
-  { name: 'Organic Website / SEO', value: 15, color: '#7c3aed' },
-  { name: 'Client Referrals', value: 12, color: '#10b981' }
-]
-
-// Revenue Velocity Bar Chart data matching the attached visual (1 AUG to 8 AUG with $14,867 spike)
-const barRevenueData = [
-  { day: '1 AUG', revenue: 21000 },
-  { day: '2 AUG', revenue: 11200 },
-  { day: '3 AUG', revenue: 14867, label: '$14,867' },
-  { day: '4 AUG', revenue: 13500 },
-  { day: '5 AUG', revenue: 16800 },
-  { day: '6 AUG', revenue: 20400 },
-  { day: '7 AUG', revenue: 24500 },
-  { day: '8 AUG', revenue: 20200 }
-]
-
-const leadSourcesData = [
-  { name: 'Organic Website', value: 596, color: '#7c3aed' },
-  { name: 'Facebook & Social Ads', value: 398, color: '#1877F2' },
-  { name: 'LinkedIn Outreach', value: 245, color: '#0A66C2' },
-  { name: 'Twitter / X Campaigns', value: 182, color: '#0f172a' },
-  { name: 'Client Referrals', value: 255, color: '#10b981' },
-  { name: 'Cold Outreach & Email', value: 171, color: '#f59e0b' }
-]
-
-const Dashboard = ({ defaultNav = 'dashboard' }) => {
+const Dashboard = () => {
   const navigate = useNavigate()
   const { user: authUser, logout: authLogout } = useAuth()
   const [user, setUser] = useState(authUser || null)
 
-  // Navigation State: 'dashboard' | 'leads' | 'staff' | 'reports' | 'settings'
-  const [activeNav, setActiveNav] = useState(
-    defaultNav === 'orders' || defaultNav === 'deals' ? 'dashboard' : defaultNav
-  )
-  const [timeRange, setTimeRange] = useState('This month')
-  const [showTimeDropdown, setShowTimeDropdown] = useState(false)
+  const userRole = (user?.role || '').toLowerCase().trim()
+  const isSuperAdmin = userRole === 'superadmin' || userRole === 'admin'
+  const isCompanyAdmin = userRole === 'company_admin'
+
+  // Sub-tabs: 'companies' | 'overview' | 'managers' | 'agents' | 'leads' | 'settings'
+  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'companies' : 'overview')
   const [searchQuery, setSearchQuery] = useState('')
-
-  // Top header popovers
-  const [showNotifications, setShowNotifications] = useState(false)
-  const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  // Database Data States
-  const [kpiStats, setKpiStats] = useState(null)
-  const [teamMembers, setTeamMembers] = useState([])
+  // SaaS Companies state
+  const [companies, setCompanies] = useState([])
+  const [showCreateCompanyModal, setShowCreateCompanyModal] = useState(false)
+  const [showEditCompanyModal, setShowEditCompanyModal] = useState(false)
+  const [editingCompany, setEditingCompany] = useState(null)
+  const [companySearchQuery, setCompanySearchQuery] = useState('')
+  const [companyStatusFilter, setCompanyStatusFilter] = useState('all')
+  const [companyTypeFilter, setCompanyTypeFilter] = useState('all')
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState('all')
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null)
+
+  // Real database states
+  const [stats, setStats] = useState({
+    totalLeads: 0,
+    unassignedLeads: 0,
+    totalManagers: 0,
+    totalAgents: 0
+  })
+  const [leadStatusDistribution, setLeadStatusDistribution] = useState([
+    { name: 'New Leads', count: 0, fill: '#8b5cf6' },
+    { name: 'In Progress', count: 0, fill: '#3b82f6' },
+    { name: 'Site Visits', count: 0, fill: '#f59e0b' },
+    { name: 'Deals Closed', count: 0, fill: '#10b981' }
+  ])
   const [managers, setManagers] = useState([])
-  const [leadSources, setLeadSources] = useState(leadSourcesData)
+  const [recentLeads, setRecentLeads] = useState([])
+  const [allLeads, setAllLeads] = useState([])
+  const [agents, setAgents] = useState([])
 
-  // Add Manager Modal State (Super Admin Root Control)
+  // Search and Filter states
+  const [leadSourceFilter, setLeadSourceFilter] = useState('all')
+  const [leadStatusFilter, setLeadStatusFilter] = useState('all')
+  const [leadSearchQuery, setLeadSearchQuery] = useState('')
+  const [agentSearchQuery, setAgentSearchQuery] = useState('')
+
+  // Modal State for Manual Lead Entry & Manager Creation
+  const [showAddLeadModal, setShowAddLeadModal] = useState(false)
   const [showAddManagerModal, setShowAddManagerModal] = useState(false)
-  const [newManager, setNewManager] = useState({
+  const [submittingManager, setSubmittingManager] = useState(false)
+  const [managerForm, setManagerForm] = useState({
     name: '',
     email: '',
-    role: 'Regional Sales Manager',
-    department: 'Sales Management',
-    monthlyQuota: 100000,
+    password: 'Manager@1234',
     phone: '',
-    password: 'Manager@1234'
+    department: 'Residential Real Estate',
+    monthlyQuota: 100000
   })
 
-  // Format today's date: "Today, Mon 22 Nov"
-  const formattedTodayDate = useMemo(() => {
-    const now = new Date()
-    const weekday = now.toLocaleDateString('en-US', { weekday: 'short' })
-    const day = now.getDate()
-    const month = now.toLocaleDateString('en-US', { month: 'short' })
-    return `Today, ${weekday} ${day} ${month}`
-  }, [])
+  const handleUserUpdated = (updatedUser) => {
+    setUser(updatedUser)
+    localStorage.setItem('crm_user', JSON.stringify(updatedUser))
+    showToast('Super Admin profile updated successfully!')
+  }
 
-  useEffect(() => {
-    if (defaultNav) {
-      setActiveNav(
-        defaultNav === 'orders' || defaultNav === 'deals' ? 'dashboard' : defaultNav
-      )
-    }
-  }, [defaultNav])
+  const showToast = (msg) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(''), 3500)
+  }
 
+  // Load user session
   useEffect(() => {
     if (authUser) {
       setUser(authUser)
     } else {
-      const storedUser = localStorage.getItem('crm_user')
-      if (storedUser) {
+      const stored = localStorage.getItem('crm_user')
+      if (stored) {
         try {
-          setUser(JSON.parse(storedUser))
+          setUser(JSON.parse(stored))
         } catch (e) {
           console.error(e)
         }
@@ -137,70 +131,167 @@ const Dashboard = ({ defaultNav = 'dashboard' }) => {
     }
   }, [authUser])
 
-  const showToast = (msg) => {
-    setToastMessage(msg)
-    setTimeout(() => setToastMessage(''), 3500)
-  }
-
-  // Fetch live metrics from DB
-  const fetchLiveAdminData = async () => {
+  // Fetch real statistics, managers, and recent leads
+  const fetchSuperAdminData = async () => {
     try {
+      setLoading(true)
       const token = localStorage.getItem('crm_token')
       const headers = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
 
-      const [mgrRes, staffRes, statsRes] = await Promise.all([
-        fetch(`${ADMIN_API_URL}/managers`, { headers, credentials: 'include' }),
-        fetch(`${ADMIN_API_URL}/staff`, { headers, credentials: 'include' }),
-        fetch(`${ADMIN_API_URL}/dashboard/stats`, { headers, credentials: 'include' })
-      ])
-
-      if (mgrRes.ok) {
-        const mData = await mgrRes.json()
-        setManagers(mData.managers || [])
-      }
-      if (staffRes.ok) {
-        const sData = await staffRes.json()
-        setTeamMembers(sData.staff || [])
-      }
+      // 1. Fetch live overview stats & lead status distribution
+      const statsRes = await fetch(`${ADMIN_API_URL}/dashboard/stats`, {
+        headers,
+        credentials: 'include'
+      })
       if (statsRes.ok) {
-        const stData = await statsRes.json()
-        if (stData.stats) setKpiStats(stData.stats)
-        if (stData.leadSources) setLeadSources(stData.leadSources)
+        const data = await statsRes.json()
+        if (data.stats) {
+          setStats((prev) => ({
+            ...prev,
+            totalLeads: typeof data.stats.totalLeads === 'number' ? data.stats.totalLeads : (data.stats.totalLeads?.raw || 0),
+            unassignedLeads: typeof data.stats.unassignedLeads === 'number' ? data.stats.unassignedLeads : (data.summary?.unassignedLeads || 0),
+            totalManagers: typeof data.stats.totalManagers === 'number' ? data.stats.totalManagers : prev.totalManagers,
+            totalAgents: typeof data.stats.totalAgents === 'number' ? data.stats.totalAgents : prev.totalAgents
+          }))
+        }
+        if (data.leadStatusDistribution && Array.isArray(data.leadStatusDistribution)) {
+          setLeadStatusDistribution(data.leadStatusDistribution)
+        }
+        if (data.managers && Array.isArray(data.managers)) {
+          setManagers(data.managers)
+        }
+        if (data.recentLeads && Array.isArray(data.recentLeads)) {
+          setRecentLeads(data.recentLeads)
+        }
       }
-    } catch (e) {
-      console.warn('Backend live sync warning:', e.message)
+
+      // 2. Fetch managers roster (ensures sync)
+      const mgrRes = await fetch(`${ADMIN_API_URL}/managers`, {
+        headers,
+        credentials: 'include'
+      })
+      if (mgrRes.ok) {
+        const mgrData = await mgrRes.json()
+        const mgrList = mgrData.managers || []
+        if (mgrList.length > 0) {
+          setManagers(mgrList)
+          setStats((prev) => ({
+            ...prev,
+            totalManagers: mgrList.length
+          }))
+        }
+      }
+
+      // 3. Fetch agents roster count & list
+      const staffRes = await fetch(`${ADMIN_API_URL}/staff`, {
+        headers,
+        credentials: 'include'
+      })
+      if (staffRes.ok) {
+        const staffData = await staffRes.json()
+        const staffList = staffData.staff || []
+        setAgents(staffList)
+        setStats((prev) => ({
+          ...prev,
+          totalAgents: staffList.length
+        }))
+      }
+
+      // 4. Fetch recent inquiries from DB
+      const leadsRes = await fetch(`${ADMIN_API_URL}/leads`, {
+        headers,
+        credentials: 'include'
+      })
+      if (leadsRes.ok) {
+        const leadsData = await leadsRes.json()
+        const leadsList = leadsData.leads || []
+        if (leadsList.length > 0) {
+          setRecentLeads(leadsList)
+          setAllLeads(leadsList)
+          setStats((prev) => ({
+            ...prev,
+            totalLeads: leadsList.length,
+            unassignedLeads: leadsList.filter((l) => !l.assignedAgent || l.status === 'New').length
+          }))
+        }
+      }
+      // 5. Fetch Companies (SaaS Multi-Company Architecture)
+      const compRes = await fetch(COMPANIES_API_URL, {
+        headers,
+        credentials: 'include'
+      })
+      if (compRes.ok) {
+        const compData = await compRes.json()
+        const compList = compData.companies || []
+        setCompanies(compList)
+      }
+    } catch (err) {
+      console.warn('Super Admin fetch error:', err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchLiveAdminData()
+    fetchSuperAdminData()
   }, [])
 
-  const handleLogout = async () => {
+  // Callback when a company is created by Superadmin
+  const handleCompanyCreated = (newCompany) => {
+    showToast(`Company '${newCompany.companyName}' and Company Admin created!`)
+    fetchSuperAdminData()
+  }
+
+  // Callback when a company is edited by Superadmin
+  const handleCompanyUpdated = (updatedCompany) => {
+    showToast(`Company '${updatedCompany.companyName}' settings updated!`)
+    setCompanies((prev) =>
+      prev.map((c) => (c._id === updatedCompany._id ? { ...c, ...updatedCompany } : c))
+    )
+  }
+
+  // Toggle company status (active / suspended / inactive)
+  const handleToggleCompanyStatus = async (companyId, newStatus) => {
     try {
-      await fetch(`${API_BASE_URL}/logout`, {
-        method: 'POST',
-        credentials: 'include'
+      setStatusUpdatingId(companyId)
+      const token = localStorage.getItem('crm_token')
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const res = await fetch(`${COMPANIES_API_URL}/${companyId}/status`, {
+        method: 'PATCH',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus })
       })
-    } catch (e) {
-      console.error('Logout error:', e)
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update company status')
+      }
+
+      setCompanies((prev) =>
+        prev.map((c) => (c._id === companyId ? { ...c, status: newStatus } : c))
+      )
+      showToast(`Company status set to '${newStatus}'`)
+    } catch (err) {
+      showToast(err.message || 'Status update failed')
     } finally {
-      if (authLogout) authLogout()
-      localStorage.removeItem('crm_token')
-      localStorage.removeItem('crm_user')
-      localStorage.removeItem('crm_admin_settings')
-      navigate('/login')
+      setStatusUpdatingId(null)
     }
   }
 
-  // Super Admin: Add Manager Submission
+  // Callback when a manual lead is created
+  const handleLeadCreated = (newLead) => {
+    showToast(`Lead '${newLead.clientName}' added successfully from ${newLead.source}!`)
+    fetchSuperAdminData()
+  }
+
+  // Create Manager Account (Superadmin Control)
   const handleAddManagerSubmit = async (e) => {
     e.preventDefault()
-    if (!newManager.name.trim() || !newManager.email.trim()) {
-      showToast('Name and work email are required!')
-      return
-    }
+    setSubmittingManager(true)
 
     try {
       const token = localStorage.getItem('crm_token')
@@ -211,894 +302,1339 @@ const Dashboard = ({ defaultNav = 'dashboard' }) => {
         method: 'POST',
         headers,
         credentials: 'include',
-        body: JSON.stringify(newManager)
+        body: JSON.stringify(managerForm)
       })
 
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to add manager')
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create manager account')
+      }
 
-      showToast(`Success: Manager ${newManager.name} registered and saved to database!`)
+      showToast(`Manager '${managerForm.name}' created successfully!`)
       setShowAddManagerModal(false)
-      setNewManager({
+      setManagerForm({
         name: '',
         email: '',
-        role: 'Regional Sales Manager',
-        department: 'Sales Management',
-        monthlyQuota: 100000,
+        password: 'Manager@1234',
         phone: '',
-        password: 'Manager@1234'
+        department: 'Residential Real Estate',
+        monthlyQuota: 100000
       })
-      await fetchLiveAdminData()
+      fetchSuperAdminData()
     } catch (err) {
-      showToast(`Error: ${err.message}`)
+      showToast(err.message || 'Error creating manager')
+    } finally {
+      setSubmittingManager(false)
     }
   }
 
-  // Admin display name
-  const adminName = useMemo(() => {
-    if (user?.name) return user.name.split(' ')[0]
-    if (user?.email) return user.email.split('@')[0]
-    return 'Barbara'
-  }, [user])
+  // Delete Manager
+  const handleDeleteManager = async (managerId, managerName) => {
+    if (!window.confirm(`Are you sure you want to remove Manager '${managerName}'?`)) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('crm_token')
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const res = await fetch(`${ADMIN_API_URL}/managers/${managerId}`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include'
+      })
+
+      if (res.ok) {
+        showToast(`Manager '${managerName}' removed.`)
+        fetchSuperAdminData()
+      } else {
+        const data = await res.json()
+        showToast(data.error || 'Failed to delete manager')
+      }
+    } catch (err) {
+      showToast(err.message || 'Error deleting manager')
+    }
+  }
+
+  const handleLogout = () => {
+    if (authLogout) {
+      authLogout()
+    } else {
+      localStorage.removeItem('crm_token')
+      localStorage.removeItem('crm_user')
+    }
+    navigate('/login')
+  }
+
+  // Filtered managers for search
+  const filteredManagers = useMemo(() => {
+    if (!searchQuery.trim()) return managers
+    const q = searchQuery.toLowerCase()
+    return managers.filter(
+      (m) =>
+        (m.name && m.name.toLowerCase().includes(q)) ||
+        (m.email && m.email.toLowerCase().includes(q)) ||
+        (m.department && m.department.toLowerCase().includes(q))
+    )
+  }, [managers, searchQuery])
+
+  // Filtered agents for search
+  const filteredAgents = useMemo(() => {
+    if (!agentSearchQuery.trim()) return agents
+    const q = agentSearchQuery.toLowerCase()
+    return agents.filter(
+      (a) =>
+        (a.name && a.name.toLowerCase().includes(q)) ||
+        (a.email && a.email.toLowerCase().includes(q)) ||
+        (a.role && a.role.toLowerCase().includes(q)) ||
+        (a.department && a.department.toLowerCase().includes(q))
+    )
+  }, [agents, agentSearchQuery])
+
+  // Filtered companies for search & filter
+  const filteredCompanies = useMemo(() => {
+    return companies.filter((c) => {
+      if (companyStatusFilter !== 'all' && c.status !== companyStatusFilter) return false
+      if (companyTypeFilter !== 'all' && c.businessType !== companyTypeFilter) return false
+      if (companySearchQuery.trim()) {
+        const q = companySearchQuery.toLowerCase()
+        const name = (c.companyName || '').toLowerCase()
+        const ownerName = (c.owner?.name || '').toLowerCase()
+        const ownerEmail = (c.owner?.email || '').toLowerCase()
+        return name.includes(q) || ownerName.includes(q) || ownerEmail.includes(q)
+      }
+      return true
+    })
+  }, [companies, companySearchQuery, companyStatusFilter, companyTypeFilter])
+
+  // Filtered leads for search, source filter, and company filter
+  const filteredLeads = useMemo(() => {
+    const list = allLeads.length > 0 ? allLeads : recentLeads
+    return list.filter((lead) => {
+      // Company tenant filter
+      if (selectedCompanyFilter !== 'all') {
+        const leadComp = lead.company?._id || lead.company
+        if (String(leadComp) !== String(selectedCompanyFilter)) return false
+      }
+      // Channel / source filter
+      if (leadSourceFilter !== 'all') {
+        const src = (lead.source || '').toLowerCase()
+        if (leadSourceFilter === 'facebook' && !src.includes('facebook')) return false
+        if (leadSourceFilter === 'instagram' && !src.includes('instagram')) return false
+        if (leadSourceFilter === 'whatsapp' && !src.includes('whatsapp')) return false
+        if (leadSourceFilter === 'direct call' && !src.includes('call') && !src.includes('manual')) return false
+        if (leadSourceFilter === 'website' && !src.includes('website')) return false
+      }
+      // Status filter
+      if (leadStatusFilter !== 'all') {
+        if ((lead.status || '').toLowerCase() !== leadStatusFilter.toLowerCase()) return false
+      }
+      // Search query
+      if (leadSearchQuery.trim()) {
+        const q = leadSearchQuery.toLowerCase()
+        const name = (lead.clientName || lead.name || '').toLowerCase()
+        const email = (lead.email || '').toLowerCase()
+        const phone = (lead.phone || '').toLowerCase()
+        const req = (lead.requirements || lead.message || '').toLowerCase()
+        return name.includes(q) || email.includes(q) || phone.includes(q) || req.includes(q)
+      }
+      return true
+    })
+  }, [allLeads, recentLeads, selectedCompanyFilter, leadSourceFilter, leadStatusFilter, leadSearchQuery])
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-[#7c3aed] via-[#8b5cf6] to-[#f8fafc] p-2.5 sm:p-5 lg:p-7 flex flex-col items-center justify-start font-sans selection:bg-violet-200 selection:text-violet-900 overflow-x-hidden">
-      
-      {/* =========================================================================
-          SIGNATURE AURORA MESH BACKGROUND ORBS (FROM HOME.JSX FOR VISUAL CONSISTENCY)
-          ========================================================================= */}
-      <div className="absolute top-[-10%] left-[-10%] w-[55rem] h-[55rem] bg-gradient-to-tr from-[#38bdf8]/40 via-[#818cf8]/50 to-[#c084fc]/40 rounded-full blur-[110px] pointer-events-none" />
-      <div className="absolute top-[5%] right-[-15%] w-[50rem] h-[50rem] bg-gradient-to-bl from-[#a855f7]/50 via-[#38bdf8]/30 to-[#f472b6]/30 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute top-[40%] left-[25%] w-[45rem] h-[25rem] bg-white/20 rounded-full blur-[90px] pointer-events-none" />
-
-      {/* Toast Notification */}
+    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans text-slate-800 antialiased">
+      {/* Toast */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-2.5 animate-bounce">
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-2xl border border-slate-700 flex items-center gap-2.5 animate-bounce">
           <Sparkles className="w-4 h-4 text-violet-400" />
           <span>{toastMessage}</span>
           <button onClick={() => setToastMessage('')} className="ml-2 text-slate-400 hover:text-white cursor-pointer">
-            <X className="w-3 h-3" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
-      {/* =========================================================================
-          MAIN FLOATING CARD DASHBOARD SHELL (MATCHING ATTACHED IMAGE & FULLY VISIBLE)
-          ========================================================================= */}
-      <div className="relative z-10 w-full max-w-[1560px] bg-white/95 backdrop-blur-2xl rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl shadow-indigo-950/25 border border-white/80 overflow-hidden flex flex-col md:flex-row min-h-[calc(100vh-2.5rem)] md:h-[calc(100vh-3.5rem)]">
-        
-        {/* =====================================================================
-            1. ULTRA-SLEEK VERTICAL ICON SIDEBAR
-            ===================================================================== */}
-        <aside className="w-full md:w-[74px] shrink-0 bg-white border-b md:border-b-0 md:border-r border-slate-100 flex md:flex-col items-center justify-between py-4 px-3 sm:py-6 h-auto md:h-full overflow-y-auto z-30">
-          
-          {/* Top: Spiral / Wave Logo + Chevron */}
-          <div className="flex md:flex-col items-center gap-4">
-            <Link
-              to="/"
-              className="w-10 h-10 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-900 hover:scale-105 transition-transform shadow-2xs"
-              title="Home / CRM Root"
-            >
-              {/* Spiral/Wave glyph from image */}
-              <svg className="w-5 h-5 text-slate-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                <path d="M4 6.5c2.2-1 4.5-1 7 0s5 1 7.5 0" />
-                <path d="M3 10.5c2.5-1 5.5-1 8 0s5 1 7.5 0" />
-                <path d="M3 14.5c2.5-1 5.5-1 8 0s5.5 1 8 0" />
-                <path d="M4 18.5c2.2-1 4.5-1 7 0s5 1 7.5 0" />
-              </svg>
+      {/* Sidebar */}
+      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 h-full z-30">
+        <div>
+          {/* Header */}
+          <div className="h-16 px-6 flex items-center gap-3 border-b border-slate-200">
+            <Link to="/" className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center text-white shadow-sm shadow-violet-500/20">
+              <ShieldCheck className="w-5 h-5" />
             </Link>
-
-            <span className="hidden md:block text-slate-300 text-xs select-none">»</span>
+            <div>
+              <span className="font-extrabold text-slate-900 text-sm block">Property CRM</span>
+              <span className="text-[10px] uppercase font-bold tracking-wider text-violet-600 block">Super Admin</span>
+            </div>
           </div>
 
-          {/* Navigation Icon List */}
-          <nav className="flex md:flex-col items-center gap-2 sm:gap-3">
-            
-            {/* 1. Dashboard / Overview */}
-            <button
-              onClick={() => setActiveNav('dashboard')}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                activeNav === 'dashboard'
-                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25'
-                  : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-              title="Overview Dashboard"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-            </button>
+          {/* Navigation */}
+          <nav className="p-4 space-y-1.5">
+            {isSuperAdmin ? (
+              /* Superadmin Strictly Limited to Company & Tenant Management (No leads, managers, or sales) */
+              <>
+                <button
+                  onClick={() => setActiveTab('companies')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer ${
+                    activeTab === 'companies'
+                      ? 'bg-violet-600 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <Building className="w-4 h-4" />
+                  <span>Registered Companies</span>
+                  <span
+                    className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      activeTab === 'companies' ? 'bg-white/20 text-white' : 'bg-violet-100 text-violet-800'
+                    }`}
+                  >
+                    {companies.length}
+                  </span>
+                </button>
 
-            {/* 2. Ingestion & Lead Channels */}
-            <button
-              onClick={() => setActiveNav('leads')}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                activeNav === 'leads'
-                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25'
-                  : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-              title="Social Lead Ingestion & Webhooks"
-            >
-              <Layers className="w-4 h-4" />
-            </button>
+                <button
+                  onClick={() => setActiveTab('settings')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer ${
+                    activeTab === 'settings' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Superadmin Settings</span>
+                </button>
+              </>
+            ) : (
+              /* Company Admin Navigation */
+              <>
+                <button
+                  onClick={() => setActiveTab('overview')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer ${
+                    activeTab === 'overview' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Company Overview</span>
+                </button>
 
-            {/* 3. Staff & Managers */}
-            <button
-              onClick={() => setActiveNav('staff')}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                activeNav === 'staff'
-                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25'
-                  : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-              title="Staff & User Management"
-            >
-              <Users className="w-4 h-4" />
-            </button>
+                <button
+                  onClick={() => setActiveTab('managers')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer ${
+                    activeTab === 'managers' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Managers</span>
+                  <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-800">
+                    {managers.length}
+                  </span>
+                </button>
 
-            {/* 4. Executive Reports */}
-            <button
-              onClick={() => setActiveNav('reports')}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                activeNav === 'reports'
-                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25'
-                  : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-              title="Executive Reports & Audits"
-            >
-              <FileText className="w-4 h-4" />
-            </button>
+                <button
+                  onClick={() => setActiveTab('agents')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer ${
+                    activeTab === 'agents' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>Sales Agents</span>
+                  <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-800">
+                    {agents.length}
+                  </span>
+                </button>
 
-            {/* 5. Settings */}
-            <button
-              onClick={() => setActiveNav('settings')}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                activeNav === 'settings'
-                  ? 'bg-slate-900 text-white shadow-md shadow-slate-900/25'
-                  : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-              title="System Settings"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+                <button
+                  onClick={() => setActiveTab('leads')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer ${
+                    activeTab === 'leads' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Company Leads</span>
+                  <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-800">
+                    {allLeads.length > 0 ? allLeads.length : stats.totalLeads}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('settings')}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer ${
+                    activeTab === 'settings' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  }`}
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Company Settings</span>
+                </button>
+              </>
+            )}
           </nav>
+        </div>
 
-          {/* Bottom: Logout Icon */}
+        {/* User Card & Logout */}
+        <div className="p-4 border-t border-slate-200 space-y-3">
+          <div className="flex items-center gap-3 px-1">
+            <div className="w-8 h-8 rounded-full bg-violet-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+              {user?.name ? user.name[0].toUpperCase() : 'A'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-slate-900 truncate">
+                Admin {user?.name || user?.username || 'Administrator'}
+              </p>
+              <p className="text-[10px] text-slate-400 truncate">{user?.email || 'admin@crm.com'}</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-xl font-semibold text-xs transition cursor-pointer ${
+              activeTab === 'settings' ? 'bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Settings className="w-3.5 h-3.5" />
+            <span>Profile & Settings</span>
+          </button>
+
           <button
             onClick={handleLogout}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-            title="Sign Out"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 font-semibold text-xs transition cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
+            <span>Sign Out</span>
           </button>
-        </aside>
+        </div>
+      </aside>
 
-        {/* =====================================================================
-            2. MAIN CONTENT AREA (SMOOTH INTERNAL SCROLLING & ZERO CUT-OFF)
-            ===================================================================== */}
-        <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto bg-[#fafafa]/50">
-          
-          {/* ===================================================================
-              TOP HEADER BAR (SEARCH, DATE PILL, SETTINGS, BELL, AVATAR)
-              =================================================================== */}
-          <header className="sticky top-0 z-20 px-5 sm:px-8 py-3.5 sm:py-4 flex items-center justify-between gap-3 border-b border-slate-100 bg-white/90 backdrop-blur-md shrink-0">
-            
-            {/* Left: Search input + Date pill */}
-            <div className="flex items-center gap-2.5 sm:gap-3 flex-1 max-w-lg">
-              <div className="relative w-full max-w-xs sm:max-w-sm">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search leads, managers, metrics..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-50/80 border border-slate-200/80 rounded-full pl-9 pr-3.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
-                />
-              </div>
-
-              {/* Dynamic Live Date Pill matching image */}
-              <div className="hidden sm:inline-flex items-center px-3 py-1 rounded-full bg-sky-50/80 text-sky-700 text-xs font-bold whitespace-nowrap border border-sky-100">
-                <span>{formattedTodayDate}</span>
-              </div>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Navbar */}
+        <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between shrink-0">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-bold text-slate-900">
+                Hello, Admin {user?.name || user?.username || 'Administrator'} 👋
+              </h1>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-violet-100 text-violet-700">
+                Root Access
+              </span>
             </div>
+            <p className="text-xs text-slate-400">
+              {activeTab === 'companies' && 'SaaS Tenant companies & dedicated Company Admin owners'}
+              {activeTab === 'overview' && 'System overview & live database metrics'}
+              {activeTab === 'managers' && 'Branch Manager accounts & quota management'}
+              {activeTab === 'agents' && 'All sales agents roster across branches'}
+              {activeTab === 'leads' && 'Complete inbound leads queue & marketing channel sources'}
+              {activeTab === 'settings' && 'Superadmin account settings & system preferences'}
+            </p>
+          </div>
 
-            {/* Right: Action Circles & Avatar */}
-            <div className="flex items-center gap-2 sm:gap-2.5">
-              
-              {/* Settings Gear */}
+          <div className="flex items-center gap-3">
+            {isSuperAdmin ? (
               <button
-                onClick={() => setActiveNav('settings')}
-                className="w-9 h-9 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
-                title="Settings"
+                onClick={() => setShowCreateCompanyModal(true)}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-violet-500/20 transition cursor-pointer"
               >
-                <Settings className="w-4 h-4" />
+                <Building className="w-4 h-4" />
+                <span>+ Create Company & Admin</span>
               </button>
-
-              {/* Notification Bell */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="w-9 h-9 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
-                  title="Notifications"
+            ) : (
+              <>
+                <Link
+                  to="/manager-dashboard"
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs shadow-xs transition cursor-pointer"
+                  title="Open and oversee Manager Dashboard with full oversight"
                 >
-                  <Bell className="w-4 h-4" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 absolute top-2 right-2.5"></span>
+                  <Eye className="w-4 h-4 text-blue-600" />
+                  <span>View Manager Dashboard</span>
+                </Link>
+                <button
+                  onClick={() => setShowAddLeadModal(true)}
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 text-violet-400" />
+                  <span>+ Add Manual Lead</span>
                 </button>
+                <button
+                  onClick={() => setShowAddManagerModal(true)}
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Create Manager</span>
+                </button>
+              </>
+            )}
+          </div>
+        </header>
 
-                {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 p-3 z-50 text-xs">
-                    <p className="font-bold text-slate-900 mb-2 pb-1 border-b border-slate-100">Notifications</p>
-                    <div className="space-y-2">
-                      <div className="p-2 rounded-xl bg-violet-50 text-violet-900">
-                        <span className="font-semibold block">New Meta lead ingested</span>
-                        <span className="text-[10px] text-slate-500">Facebook Leadgen • Just now</span>
-                      </div>
-                      <div className="p-2 rounded-xl bg-emerald-50 text-emerald-900">
-                        <span className="font-semibold block">Deal Won: $14,867</span>
-                        <span className="text-[10px] text-slate-500">Enterprise Cloud Migration</span>
-                      </div>
-                    </div>
+        {/* Scrollable View Area */}
+        <main className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+          {/* TAB 0: SAAS MULTI-COMPANY TENANTS */}
+          {activeTab === 'companies' && (
+            <div className="space-y-6 animate-fade-in">
+              {/* SaaS Top Metric Cards - Strictly Tenant Focused */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">Registered Companies</span>
+                    <Building className="w-4 h-4 text-violet-600" />
                   </div>
-                )}
+                  <div className="text-3xl font-black text-slate-900 mt-2 font-mono">
+                    {companies.length}
+                  </div>
+                  <span className="text-[11px] text-violet-600 mt-1 block">Active SaaS Client Tenants</span>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">Active Workspaces</span>
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="text-3xl font-black text-emerald-600 mt-2 font-mono">
+                    {companies.filter((c) => c.status === 'active').length}
+                  </div>
+                  <span className="text-[11px] text-emerald-600/80 mt-1 block">Operational Status</span>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">Industry Categories</span>
+                    <Layers className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div className="text-3xl font-black text-blue-700 mt-2 font-mono">
+                    {new Set(companies.map((c) => c.businessType || c.industryType).filter(Boolean)).size || 1}
+                  </div>
+                  <span className="text-[11px] text-blue-600/80 mt-1 block">Configured Business Types</span>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-500">Suspended / Inactive</span>
+                    <Clock className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div className="text-3xl font-black text-amber-700 mt-2 font-mono">
+                    {companies.filter((c) => c.status !== 'active').length}
+                  </div>
+                  <span className="text-[11px] text-amber-600/80 mt-1 block">Requires Administrator Review</span>
+                </div>
               </div>
 
-              {/* Admin Avatar */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowUserDropdown(!showUserDropdown)}
-                  className="w-9 h-9 rounded-full overflow-hidden border border-slate-200 shadow-2xs hover:ring-2 hover:ring-violet-400 transition cursor-pointer"
-                  title={user?.email || 'Admin Profile'}
-                >
-                  {user?.avatar ? (
-                    <img src={user.avatar} alt="Admin" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center">
-                      {user?.name ? user.name[0].toUpperCase() : (user?.email ? user.email[0].toUpperCase() : 'B')}
-                    </div>
-                  )}
-                </button>
-
-                {showUserDropdown && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-50 text-xs font-semibold">
-                    <div className="px-3.5 py-2 border-b border-slate-100">
-                      <p className="font-bold text-slate-900 truncate">{user?.name || adminName}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{user?.email || 'admin@crm.com'}</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setActiveNav('settings')
-                        setShowUserDropdown(false)
-                      }}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 text-slate-700 flex items-center gap-2 cursor-pointer"
-                    >
-                      <Settings className="w-3.5 h-3.5" />
-                      <span>Account Settings</span>
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 border-t border-slate-50 cursor-pointer"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Sign Out</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-            </div>
-          </header>
-
-          {/* ===================================================================
-              SUB-VIEW ROUTER (OVERVIEW vs LEADS vs STAFF vs REPORTS vs SETTINGS)
-              =================================================================== */}
-          <main className="p-4 sm:p-7 pb-20 space-y-6 flex-1 min-w-0">
-            
-            {/* =================================================================
-                SCREEN 1: OVERVIEW CRM DASHBOARD
-                ================================================================= */}
-            {activeNav === 'dashboard' && (
-              <div className="space-y-6 animate-fade-in">
-                
-                {/* Greeting & Timeframe Select */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Company Management Card & Controls */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
                   <div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                      Hello, {adminName}! 👋
-                    </h1>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                      Executive CRM oversight, pipeline velocity & team performance.
+                    <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                      <Building className="w-4 h-4 text-violet-600" />
+                      <span>Company Accounts & Independent Tenants</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Create and manage company workspaces, provision Company Admins, and monitor data isolation.
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {/* Time Range Dropdown */}
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowTimeDropdown(!showTimeDropdown)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200/90 text-xs font-bold text-slate-800 shadow-2xs hover:bg-slate-50 transition cursor-pointer"
-                      >
-                        <span>{timeRange}</span>
-                        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                      </button>
+                  <button
+                    onClick={() => setShowCreateCompanyModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-violet-500/20 transition cursor-pointer self-start sm:self-auto shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Provision New Company & Admin</span>
+                  </button>
+                </div>
 
-                      {showTimeDropdown && (
-                        <div className="absolute right-0 mt-1.5 w-36 bg-white rounded-2xl shadow-xl border border-slate-100 py-1 z-50 text-xs font-semibold">
-                          {['Today', 'This week', 'This month', 'This quarter', 'This year'].map((t) => (
-                            <button
-                              key={t}
-                              onClick={() => {
-                                setTimeRange(t)
-                                setShowTimeDropdown(false)
-                              }}
-                              className={`w-full text-left px-3.5 py-1.5 hover:bg-violet-50 transition cursor-pointer ${
-                                timeRange === t ? 'text-violet-700 font-bold bg-violet-50/50' : 'text-slate-700'
-                              }`}
-                            >
-                              {t}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                {/* Search & Filters */}
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search company name, admin name, or email..."
+                      value={companySearchQuery}
+                      onChange={(e) => setCompanySearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 font-medium"
+                    />
+                  </div>
 
-                    {/* Calendar Pill Button */}
-                    <button
-                      onClick={() => showToast('Calendar date filter active')}
-                      className="w-8 h-8 rounded-full bg-white border border-slate-200/90 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-2xs transition cursor-pointer"
-                      title="Select date range"
+                  <div className="flex items-center gap-2.5 overflow-x-auto pb-1 sm:pb-0">
+                    <select
+                      value={companyTypeFilter}
+                      onChange={(e) => setCompanyTypeFilter(e.target.value)}
+                      className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
                     >
-                      <Calendar className="w-3.5 h-3.5" />
-                    </button>
+                      <option value="all">All Industries</option>
+                      <option value="real_estate">Real Estate</option>
+                      <option value="restaurant">Restaurant</option>
+                      <option value="automotive">Automotive</option>
+                      <option value="services">Services</option>
+                      <option value="retail">Retail</option>
+                      <option value="other">Other</option>
+                    </select>
+
+                    <select
+                      value={companyStatusFilter}
+                      onChange={(e) => setCompanyStatusFilter(e.target.value)}
+                      className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="active">Active Only</option>
+                      <option value="suspended">Suspended</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
                   </div>
                 </div>
 
-                {/* ROW 1: 4 KPI CARDS (2x2) + REVENUE VELOCITY BAR CHART */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-                  
-                  {/* Left: 4 Metric Cards in 2x2 Grid (6 cols) */}
-                  <div className="lg:col-span-6 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    
-                    {/* Card 1: Total Revenue (Vibrant Purple Filled Card) */}
-                    <div className="bg-gradient-to-br from-[#5356ff] via-[#6366f1] to-[#7c3aed] text-white p-5 rounded-[1.75rem] shadow-lg shadow-indigo-600/20 flex flex-col justify-between relative overflow-hidden group hover:-translate-y-0.5 transition-all">
-                      <div className="flex items-start justify-between">
-                        <span className="text-xs font-semibold text-white/90">Total revenue</span>
-                        <button
-                          onClick={() => setActiveNav('reports')}
-                          className="w-7 h-7 rounded-full bg-white/20 hover:bg-white text-white hover:text-indigo-600 flex items-center justify-center transition cursor-pointer"
-                          title="View Reports"
+                {/* Companies Grid / Roster */}
+                {filteredCompanies.length === 0 ? (
+                  <div className="text-center py-16 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                    <Building className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                    <h4 className="text-sm font-bold text-slate-800">No Companies Found</h4>
+                    <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                      {companySearchQuery || companyStatusFilter !== 'all' || companyTypeFilter !== 'all'
+                        ? 'No companies match your search criteria. Try resetting the filters.'
+                        : 'No independent company accounts have been registered yet. Create your first company to get started.'}
+                    </p>
+                    <button
+                      onClick={() => setShowCreateCompanyModal(true)}
+                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Provision First Company</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filteredCompanies.map((c) => {
+                      const typeLabel =
+                        c.businessType === 'real_estate'
+                          ? '🏢 Real Estate'
+                          : c.businessType === 'restaurant'
+                          ? '🍽️ Restaurant'
+                          : c.businessType === 'automotive'
+                          ? '🚗 Automotive'
+                          : c.businessType === 'services'
+                          ? '💼 Services'
+                          : c.businessType === 'retail'
+                          ? '🛍️ Retail'
+                          : '🌐 Enterprise'
+
+                      return (
+                        <div
+                          key={c._id}
+                          className="bg-white rounded-2xl border border-slate-200 hover:border-violet-300 hover:shadow-md transition p-5 space-y-4 flex flex-col justify-between"
                         >
-                          <ArrowUpRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                          <div>
+                            {/* Card Header */}
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <h4 className="font-extrabold text-sm text-slate-900 line-clamp-1">
+                                  {c.companyName}
+                                </h4>
+                                <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                  {typeLabel}
+                                </span>
+                              </div>
 
-                      <div className="my-3">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl sm:text-3xl font-black tracking-tight">
-                            $ {kpiStats?.totalRevenue?.raw ? (kpiStats.totalRevenue.raw / 1000).toFixed(3) : '99.560'}
-                          </span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-400/25 text-emerald-200 border border-emerald-400/30">
-                            ↑ 2.61%
-                          </span>
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1 ${
+                                  c.status === 'active'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : c.status === 'suspended'
+                                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                    : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                }`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    c.status === 'active'
+                                      ? 'bg-emerald-500'
+                                      : c.status === 'suspended'
+                                      ? 'bg-rose-500'
+                                      : 'bg-slate-400'
+                                  }`}
+                                />
+                                <span>{c.status}</span>
+                              </span>
+                            </div>
+
+                            {/* Company Admin (Owner) Details Box */}
+                            <div className="mt-3.5 p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1.5 text-xs">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                Company Admin (Owner)
+                              </span>
+                              <div className="font-bold text-slate-900 truncate">
+                                {c.owner?.name || c.contactEmail || 'Admin User'}
+                              </div>
+                              <div className="text-[11px] text-slate-500 truncate flex items-center gap-1.5">
+                                <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                                <span>{c.owner?.email || c.contactEmail}</span>
+                              </div>
+                              {c.contactPhone && (
+                                <div className="text-[11px] text-slate-500 truncate flex items-center gap-1.5">
+                                  <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                                  <span>{c.contactPhone}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Public Form URL Link */}
+                            <div className="mt-2.5 px-3 py-2 bg-violet-50/70 border border-violet-100 rounded-xl flex items-center justify-between text-[11px]">
+                              <div className="min-w-0 pr-2">
+                                <span className="text-[10px] text-violet-600 font-bold block">Public Tenant Lead Form:</span>
+                                <span className="font-mono text-slate-700 truncate block text-[10px]">
+                                  /form/{c.companySlug || c._id}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const url = `${window.location.origin}/form/${c.companySlug || c._id}`
+                                  navigator.clipboard.writeText(url)
+                                  showToast(`Copied public URL: ${url}`)
+                                }}
+                                className="px-2 py-1 rounded-lg bg-white border border-violet-200 text-violet-700 hover:bg-violet-100 font-bold text-[10px] shrink-0 cursor-pointer shadow-2xs"
+                                title="Copy public link to share with clients or embed in website"
+                              >
+                                Copy Link
+                              </button>
+                            </div>
+
+                            {/* Company Tenant Meta Strip */}
+                            <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                              <span className="flex items-center gap-1">
+                                <span className="font-semibold text-slate-400">Slug:</span>
+                                <span className="font-mono text-slate-700 font-bold">{c.companySlug || 'default'}</span>
+                              </span>
+                              <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-medium">
+                                {c.address ? c.address.slice(0, 20) : 'Workspace Tenant'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Card Footer Actions */}
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                            <a
+                              href={`/form/${c.companySlug || c._id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="py-1.5 px-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-[11px] transition text-center cursor-pointer shrink-0"
+                              title="Preview public inquiry form in new tab"
+                            >
+                              Public Form ↗
+                            </a>
+
+                            <button
+                              onClick={() => {
+                                setEditingCompany(c)
+                                setShowEditCompanyModal(true)
+                              }}
+                              className="flex-1 py-1.5 px-3 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-700 font-bold text-[11px] transition text-center cursor-pointer flex items-center justify-center gap-1.5"
+                              title="Edit company name, industry type, and tenant settings"
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                              <span>Edit Settings</span>
+                            </button>
+
+                            {c.status === 'active' ? (
+                              <button
+                                disabled={statusUpdatingId === c._id}
+                                onClick={() => handleToggleCompanyStatus(c._id, 'suspended')}
+                                className="py-1.5 px-3 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
+                                title="Suspend this tenant account"
+                              >
+                                Suspend
+                              </button>
+                            ) : (
+                              <button
+                                disabled={statusUpdatingId === c._id}
+                                onClick={() => handleToggleCompanyStatus(c._id, 'active')}
+                                className="py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
+                                title="Reactivate this tenant account"
+                              >
+                                Activate
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-                      <span className="text-[10px] text-white/70 font-medium">This month vs last</span>
-                    </div>
+          {/* TAB 1: SYSTEM OVERVIEW */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6 animate-fade-in">
+              {/* 4 Essential Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
+                  <span className="text-xs font-semibold text-slate-500">Total Property Inquiries</span>
+                  <div className="text-3xl font-black text-slate-900 mt-2 font-mono">
+                    {stats.totalLeads}
+                  </div>
+                  <span className="text-[11px] text-slate-400 mt-1 block">Submitted from Home Page</span>
+                </div>
 
-                    {/* Card 2: Active Sales Team / Staff */}
-                    <div className="bg-white border border-slate-100 p-5 rounded-[1.75rem] shadow-xs flex flex-col justify-between hover:-translate-y-0.5 transition-all">
-                      <div className="flex items-start justify-between">
-                        <span className="text-xs font-semibold text-slate-600">Active team staff</span>
-                        <button
-                          onClick={() => setActiveNav('staff')}
-                          className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-900 text-slate-600 hover:text-white flex items-center justify-center transition cursor-pointer"
-                          title="View Staff Directory"
-                        >
-                          <ArrowUpRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
+                  <span className="text-xs font-semibold text-slate-500">Unassigned Inquiries</span>
+                  <div className="text-3xl font-black text-amber-600 mt-2 font-mono">
+                    {stats.unassignedLeads}
+                  </div>
+                  <span className="text-[11px] text-amber-600/80 mt-1 block">Awaiting Manager Assignment</span>
+                </div>
 
-                      <div className="my-3">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                            {teamMembers.length > 0 ? teamMembers.length : 35}
-                          </span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
-                            ↑ 4.20%
-                          </span>
-                        </div>
-                      </div>
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
+                  <span className="text-xs font-semibold text-slate-500">Active Branch Managers</span>
+                  <div className="text-3xl font-black text-violet-700 mt-2 font-mono">
+                    {stats.totalManagers}
+                  </div>
+                  <span className="text-[11px] text-violet-600/80 mt-1 block">Authorized Manager Accounts</span>
+                </div>
 
-                      <span className="text-[10px] text-slate-400 font-medium">Authorized Managers & Reps</span>
-                    </div>
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
+                  <span className="text-xs font-semibold text-slate-500">Registered Sales Agents</span>
+                  <div className="text-3xl font-black text-emerald-600 mt-2 font-mono">
+                    {stats.totalAgents}
+                  </div>
+                  <span className="text-[11px] text-emerald-600/80 mt-1 block">Managed by Branch Managers</span>
+                </div>
+              </div>
 
-                    {/* Card 3: Total Leads */}
-                    <div className="bg-white border border-slate-100 p-5 rounded-[1.75rem] shadow-xs flex flex-col justify-between hover:-translate-y-0.5 transition-all">
-                      <div className="flex items-start justify-between">
-                        <span className="text-xs font-semibold text-slate-600">Total active leads</span>
-                        <button
-                          onClick={() => setActiveNav('leads')}
-                          className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-900 text-slate-600 hover:text-white flex items-center justify-center transition cursor-pointer"
-                          title="View Leads"
-                        >
-                          <ArrowUpRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <div className="my-3">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                            {kpiStats?.totalLeads?.raw ? kpiStats.totalLeads.raw.toLocaleString() : '45.600'}
-                          </span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
-                            +18 today
-                          </span>
-                        </div>
-                      </div>
-
-                      <span className="text-[10px] text-slate-400 font-medium">Real-time Meta Ingestion</span>
-                    </div>
-
-                    {/* Card 4: Deals Win Rate */}
-                    <div className="bg-white border border-slate-100 p-5 rounded-[1.75rem] shadow-xs flex flex-col justify-between hover:-translate-y-0.5 transition-all">
-                      <div className="flex items-start justify-between">
-                        <span className="text-xs font-semibold text-slate-600">Deals win rate</span>
-                        <button
-                          onClick={() => setActiveNav('reports')}
-                          className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-900 text-slate-600 hover:text-white flex items-center justify-center transition cursor-pointer"
-                          title="View Reports"
-                        >
-                          <ArrowUpRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <div className="my-3">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                            $ 60.450
-                          </span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
-                            ↑ 5.67%
-                          </span>
-                        </div>
-                      </div>
-
-                      <span className="text-[10px] text-slate-400 font-medium">Pipeline velocity vs last</span>
-                    </div>
-
+              {/* Lead Progression & Status Distribution Chart */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-violet-600" />
+                      <span>System-wide Lead Progression & Status Distribution</span>
+                    </h3>
+                    <p className="text-xs text-slate-500">Live breakdown of website customer inquiries progressing across sales stages</p>
                   </div>
 
-                  {/* Right: Large Revenue Velocity Bar Chart (6 cols) */}
-                  <div className="lg:col-span-6 min-w-0 bg-white border border-slate-100 p-5 sm:p-6 rounded-[2rem] shadow-xs flex flex-col justify-between">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="text-base font-extrabold text-slate-900 tracking-tight">Pipeline Revenue</h3>
-                        <p className="text-[11px] text-slate-400 font-medium">Won contracts this month vs last</p>
-                      </div>
+                  <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-violet-500"></span> New</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> In Progress</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Site Visits</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Closed Deals</span>
+                  </div>
+                </div>
 
-                      <button
-                        onClick={() => setActiveNav('reports')}
-                        className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-violet-600 transition cursor-pointer"
-                        title="View Detailed Revenue Analytics"
-                      >
-                        <ArrowUpRight className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* Recharts Bar Chart */}
-                    <div className="h-60 w-full relative pt-2">
+                {stats.totalLeads === 0 ? (
+                  <div className="h-52 flex flex-col items-center justify-center text-center p-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                    <BarChart3 className="w-8 h-8 text-slate-300 mb-2" />
+                    <p className="text-xs font-semibold text-slate-600">No Lead Inquiries Recorded</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Inquiries submitted on the public Home Page will automatically populate here in real-time.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+                    {/* Left: Recharts Bar Chart (8 cols) */}
+                    <div className="lg:col-span-8 h-56 w-full pt-2">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={barRevenueData} margin={{ top: 20, right: 10, left: -10, bottom: 0 }}>
+                        <BarChart data={leadStatusDistribution} margin={{ top: 15, right: 15, left: -20, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                           <XAxis
-                            dataKey="day"
+                            dataKey="name"
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                            tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
                           />
                           <YAxis
                             axisLine={false}
                             tickLine={false}
-                            tick={{ fill: '#94a3b8', fontSize: 10 }}
-                            tickFormatter={(v) => `$ ${v.toLocaleString()}`}
-                            domain={[0, 25000]}
-                            ticks={[0, 1000, 5000, 10000, 15000, 20000, 25000]}
+                            allowDecimals={false}
+                            tick={{ fill: '#94a3b8', fontSize: 11 }}
                           />
                           <Tooltip
-                            cursor={{ fill: 'rgba(99, 102, 241, 0.05)' }}
+                            cursor={{ fill: 'rgba(139, 92, 246, 0.05)' }}
                             content={({ active, payload }) => {
                               if (active && payload && payload.length) {
                                 return (
-                                  <div className="bg-slate-900 text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg">
-                                    ${payload[0].value?.toLocaleString()}
+                                  <div className="bg-slate-900 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg">
+                                    {payload[0].payload.name}: {payload[0].value} leads
                                   </div>
                                 )
                               }
                               return null
                             }}
                           />
-                          <Bar
-                            dataKey="revenue"
-                            fill="#6366f1"
-                            radius={[8, 8, 8, 8]}
-                            barSize={24}
-                          />
+                          <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={38}>
+                            {leadStatusDistribution.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.fill} />
+                            ))}
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
-                  </div>
 
-                </div>
-
-                {/* ROW 2: BOTTOM 3 SECTIONS (QUALIFIED LEADS, LIVE CUSTOMERS, LEAD CHANNELS DONUT) */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-                  
-                  {/* Left: 98 Qualified Leads Card (3 cols) */}
-                  <div
-                    onClick={() => setActiveNav('leads')}
-                    className="lg:col-span-3 min-w-0 bg-white border border-slate-100 p-5 sm:p-6 rounded-[2rem] shadow-xs flex flex-col justify-between hover:shadow-md transition-all cursor-pointer group"
-                  >
-                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 group-hover:bg-violet-100 group-hover:text-violet-700 transition">
-                      <Check className="w-4 h-4 stroke-[2.5]" />
-                    </div>
-
-                    <div className="my-4">
-                      <h4 className="text-3xl font-black text-slate-900 tracking-tight">
-                        98 <span className="text-lg font-bold text-slate-700">leads</span>
-                      </h4>
-                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                        12 leads <span className="text-rose-500 font-semibold">are awaiting</span> rep assignment.
-                      </p>
-                    </div>
-
-                    <div className="text-[11px] font-bold text-violet-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                      <span>View Leads Ingestion</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </div>
-                  </div>
-
-                  {/* Center: 17 Customers Card with Wave Graphic & Floating Action Arrow (4 cols) */}
-                  <div className="lg:col-span-4 min-w-0 bg-white border border-slate-100 p-5 sm:p-6 rounded-[2rem] shadow-xs flex flex-col justify-between relative overflow-hidden">
-                    
-                    {/* Abstract wave pattern from image */}
-                    <svg className="absolute right-0 bottom-0 w-44 h-32 text-indigo-200/60 pointer-events-none" viewBox="0 0 150 100" fill="none" stroke="currentColor">
-                      <path d="M10 90 C 40 40, 70 80, 100 20 S 140 60, 150 10" strokeWidth="1.2" strokeDasharray="3 3" />
-                      <path d="M15 95 C 45 45, 75 85, 105 25 S 145 65, 150 15" strokeWidth="1.2" />
-                      <path d="M20 100 C 50 50, 80 90, 110 30 S 150 70, 150 20" strokeWidth="1.2" strokeDasharray="2 2" />
-                    </svg>
-
-                    <div className="flex items-center justify-between">
-                      <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-700">
-                        <User className="w-4 h-4" />
+                    {/* Right: Quick Stage Summaries (4 cols) */}
+                    <div className="lg:col-span-4 space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                        <span className="font-bold text-slate-700">Stage Breakdown</span>
+                        <span className="text-[11px] font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full font-mono">
+                          {stats.totalLeads} Total
+                        </span>
                       </div>
 
-                      {/* Floating dark circle button from image */}
-                      <button
-                        onClick={() => setActiveNav('leads')}
-                        className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-violet-600 transition shadow-sm cursor-pointer"
-                        title="Open Lead Analytics"
-                      >
-                        <ArrowUpRight className="w-4 h-4" />
-                      </button>
-                    </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-slate-600">
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-violet-500"></span>
+                            <span>New Inquiries</span>
+                          </span>
+                          <span className="font-bold font-mono text-slate-900">
+                            {leadStatusDistribution.find((d) => d.name === 'New Leads')?.count || 0}
+                          </span>
+                        </div>
 
-                    <div className="my-4 relative z-10">
-                      <h4 className="text-3xl font-black text-slate-900 tracking-tight">
-                        17 <span className="text-lg font-bold text-slate-700">customers</span>
-                      </h4>
-                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                        17 customers <span className="text-rose-500 font-semibold">are waiting</span> for response.
-                      </p>
-                    </div>
+                        <div className="flex items-center justify-between text-slate-600">
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                            <span>In Progress / Follow-up</span>
+                          </span>
+                          <span className="font-bold font-mono text-slate-900">
+                            {leadStatusDistribution.find((d) => d.name === 'In Progress')?.count || 0}
+                          </span>
+                        </div>
 
-                    <span className="text-[11px] text-slate-400 font-medium">Customer Chat Sessions</span>
-                  </div>
+                        <div className="flex items-center justify-between text-slate-600">
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                            <span>Site Visits Scheduled</span>
+                          </span>
+                          <span className="font-bold font-mono text-slate-900">
+                            {leadStatusDistribution.find((d) => d.name === 'Site Visits')?.count || 0}
+                          </span>
+                        </div>
 
-                  {/* Right: Lead Ingestion by Channel Donut Chart (5 cols) */}
-                  <div className="lg:col-span-5 min-w-0 bg-white border border-slate-100 p-5 sm:p-6 rounded-[2rem] shadow-xs flex flex-col justify-between">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
-                          Leads by Channel
-                        </h3>
-                        <p className="text-[11px] text-slate-400 font-medium">This month vs last</p>
+                        <div className="flex items-center justify-between text-slate-600">
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span>Closed & Converted</span>
+                          </span>
+                          <span className="font-bold font-mono text-emerald-700">
+                            {leadStatusDistribution.find((d) => d.name === 'Deals Closed')?.count || 0}
+                          </span>
+                        </div>
                       </div>
-
-                      <button
-                        onClick={() => setActiveNav('leads')}
-                        className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-violet-600 transition cursor-pointer"
-                        title="View Full Lead Analytics"
-                      >
-                        <ArrowUpRight className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
-                      
-                      {/* Donut with slice labels matching image */}
-                      <div className="sm:col-span-5 min-w-0 h-44 w-full relative">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={crmLeadChannelsData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={36}
-                              outerRadius={65}
-                              paddingAngle={3}
-                              dataKey="value"
-                              label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-                                const RADIAN = Math.PI / 180
-                                const radius = innerRadius + (outerRadius - innerRadius) * 0.5
-                                const x = cx + radius * Math.cos(-midAngle * RADIAN)
-                                const y = cy + radius * Math.sin(-midAngle * RADIAN)
-                                return (
-                                  <text
-                                    x={x}
-                                    y={y}
-                                    fill="#ffffff"
-                                    textAnchor="middle"
-                                    dominantBaseline="central"
-                                    className="text-[9px] font-bold"
-                                  >
-                                    {`${(percent * 100).toFixed(0)}%`}
-                                  </text>
-                                )
-                              }}
-                              labelLine={false}
-                            >
-                              {crmLeadChannelsData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} stroke="#ffffff" strokeWidth={2} />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                  return (
-                                    <div className="bg-slate-900 text-white px-2.5 py-1 rounded-lg text-xs font-bold shadow-lg">
-                                      {payload[0].name}: {payload[0].value}%
-                                    </div>
-                                  )
-                                }
-                                return null
-                              }}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      {/* Legend List on Right */}
-                      <div className="sm:col-span-7 min-w-0 space-y-1.5 text-xs">
-                        {crmLeadChannelsData.map((cat, idx) => (
-                          <div key={idx} className="flex items-center gap-2 truncate">
-                            <span
-                              className="w-2.5 h-2.5 rounded-full shrink-0"
-                              style={{ backgroundColor: cat.color }}
-                            />
-                            <span className="text-slate-600 truncate font-semibold text-[11px]">{cat.name}</span>
-                          </div>
-                        ))}
-                      </div>
-
                     </div>
                   </div>
-
-                </div>
-
+                )}
               </div>
-            )}
 
-            {/* =================================================================
-                SCREEN 2: SOCIAL MEDIA LEAD INGESTION & WEBHOOKS
-                ================================================================= */}
-            {activeNav === 'leads' && (
-              <LeadAnalyticsWidget />
-            )}
+              {/* Real Inbound Leads Flow */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900">Recent Property Inquiries</h3>
+                    <p className="text-xs text-slate-500">Live incoming leads submitted directly by website visitors & manual campaigns</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setShowAddLeadModal(true)}
+                      className="text-xs font-bold text-violet-600 hover:text-violet-700 hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Manual Lead</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('managers')}
+                      className="text-xs font-bold text-slate-500 hover:text-slate-800 hover:underline cursor-pointer"
+                    >
+                      Manage Managers →
+                    </button>
+                  </div>
+                </div>
 
-            {/* =================================================================
-                SCREEN 3: EXECUTIVE REPORTS & INTELLIGENCE
-                ================================================================= */}
-            {activeNav === 'reports' && (
-              <AdminReportsWidget
-                kpiStats={kpiStats}
-                revenueData={barRevenueData}
-                leadSources={leadSources}
-                teamMembers={teamMembers}
-                managers={managers}
-                showToast={showToast}
-              />
-            )}
+                {recentLeads.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-8 text-center">No inquiries submitted yet. Submit a test form on the Home Page or click "+ Add Manual Lead".</p>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-500 uppercase font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="py-3 px-4">Client Name</th>
+                          <th className="py-3 px-4">Contact</th>
+                          <th className="py-3 px-4">Requirements & Property</th>
+                          <th className="py-3 px-4">Budget</th>
+                          <th className="py-3 px-4">Assigned Agent</th>
+                          <th className="py-3 px-4 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {recentLeads.slice(0, 10).map((l) => (
+                          <tr key={l._id} className="hover:bg-slate-50/60 transition">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-slate-900">{l.clientName || l.name}</span>
+                                {l.source && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-violet-50 text-violet-700 border border-violet-100">
+                                    {l.source}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600">
+                              <div>{l.email}</div>
+                              <div className="text-[11px] text-slate-400">{l.phone || 'No phone'}</div>
+                            </td>
+                            <td className="py-3 px-4 max-w-xs">
+                              <span className="font-semibold text-slate-800">{l.propertyType || 'Residential'}</span>
+                              <p className="text-[11px] text-slate-500 truncate">{l.requirements || l.message || 'Requirements pending'}</p>
+                            </td>
+                            <td className="py-3 px-4 font-bold text-slate-900">
+                              {l.budget || 'N/A'}
+                            </td>
+                            <td className="py-3 px-4">
+                              {l.assignedAgent ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px]">
+                                  <CheckCircle className="w-3 h-3" />
+                                  <span>{l.assignedAgent.name || 'Assigned'}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px]">
+                                  <Clock className="w-3 h-3" />
+                                  <span>Unassigned</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="px-2 py-0.5 rounded-full font-bold text-[10px] bg-slate-100 text-slate-700 border border-slate-200">
+                                {l.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-            {/* =================================================================
-                SCREEN 4: ADMIN & PLATFORM SETTINGS
-                ================================================================= */}
-            {activeNav === 'settings' && (
+          {/* TAB 2: MANAGER ACCOUNTS MANAGEMENT */}
+          {activeTab === 'managers' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900">Authorized Branch Managers</h3>
+                    <p className="text-xs text-slate-500">Managers have permission to create Agent accounts and assign incoming leads</p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Search managers..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => setShowAddManagerModal(true)}
+                      className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Add Manager</span>
+                    </button>
+                  </div>
+                </div>
+
+                {filteredManagers.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 text-xs">
+                    No manager accounts registered yet. Click "+ Add Manager" above.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-500 uppercase font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="py-3 px-4">Manager Profile</th>
+                          <th className="py-3 px-4">Contact Details</th>
+                          <th className="py-3 px-4">Branch / Department</th>
+                          <th className="py-3 px-4 text-right">Target Quota</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredManagers.map((mgr) => (
+                          <tr key={mgr._id || mgr.id} className="hover:bg-slate-50/60 transition">
+                            <td className="py-3 px-4">
+                              <p className="font-bold text-slate-900 text-xs">{mgr.name}</p>
+                              <span className="inline-block mt-0.5 px-2 py-0.2 rounded-full bg-violet-50 text-violet-700 font-semibold text-[10px]">
+                                {mgr.role || 'Sales Manager'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600">
+                              <p>{mgr.email}</p>
+                              <p className="text-[11px] text-slate-400">{mgr.phone || 'No phone'}</p>
+                            </td>
+                            <td className="py-3 px-4 text-slate-700 font-medium">
+                              {mgr.department || 'Sales Management'}
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                              ${(mgr.monthlyQuota || 100000).toLocaleString()}
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <button
+                                onClick={() => handleDeleteManager(mgr._id || mgr.id, mgr.name)}
+                                className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition cursor-pointer"
+                                title="Remove Manager"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: SALES AGENTS ROSTER (ALL AGENTS ACROSS ALL BRANCHES) */}
+          {activeTab === 'agents' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                      <UserCheck className="w-4 h-4 text-violet-600" />
+                      <span>Sales Agents Directory ({filteredAgents.length})</span>
+                    </h3>
+                    <p className="text-xs text-slate-500">Superadmin oversight of all active sales agents managed across branch teams</p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Search agents by name, email, or department..."
+                        value={agentSearchQuery}
+                        onChange={(e) => setAgentSearchQuery(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/20 w-64"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {filteredAgents.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 text-xs">
+                    No sales agents found. Branch managers create and manage agents from their dashboard.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-500 uppercase font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="py-3 px-4">Agent Profile</th>
+                          <th className="py-3 px-4">Contact Details</th>
+                          <th className="py-3 px-4">Role & Department</th>
+                          <th className="py-3 px-4 text-center">Deals Closed</th>
+                          <th className="py-3 px-4 text-right">Target Quota</th>
+                          <th className="py-3 px-4 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredAgents.map((ag) => (
+                          <tr key={ag._id || ag.id} className="hover:bg-slate-50/60 transition">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-700 font-bold flex items-center justify-center shrink-0 text-xs">
+                                  {ag.name ? ag.name[0].toUpperCase() : 'A'}
+                                </div>
+                                <div>
+                                  <p className="font-bold text-slate-900 text-xs">{ag.name}</p>
+                                  <span className="text-[10px] text-slate-400">Sales Representative</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600">
+                              <p>{ag.email}</p>
+                              <p className="text-[11px] text-slate-400">{ag.phone || 'No phone'}</p>
+                            </td>
+                            <td className="py-3 px-4 text-slate-700 font-medium">
+                              <p className="text-slate-900 font-semibold">{ag.role || 'Sales Agent'}</p>
+                              <p className="text-[11px] text-slate-400">{ag.department || 'Residential Sales'}</p>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="px-2.5 py-1 rounded-full font-mono font-bold text-xs bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                {ag.dealsClosed ?? 0} Closed
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                              ${(ag.monthlyQuota || 50000).toLocaleString()}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span>{ag.status || 'Active'}</span>
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: ALL PROPERTY LEADS (INSPECTION & PIPELINE) */}
+          {activeTab === 'leads' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-violet-600" />
+                      <span>All Inbound Property Leads Pipeline</span>
+                    </h3>
+                    <p className="text-xs text-slate-500">Live feed across Website, Meta Ads, WhatsApp, and Direct Phone Call channels</p>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      onClick={() => setShowAddLeadModal(true)}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Add Manual Lead</span>
+                    </button>
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Search leads by name, email, requirements..."
+                        value={leadSearchQuery}
+                        onChange={(e) => setLeadSearchQuery(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/20 w-56 sm:w-64"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Multi-Company Tenant Filter (Superadmin Global View) */}
+                {isSuperAdmin && companies.length > 0 && (
+                  <div className="flex items-center gap-2 p-2.5 bg-violet-50/70 border border-violet-100 rounded-xl text-xs">
+                    <Building className="w-4 h-4 text-violet-600 shrink-0" />
+                    <span className="font-bold text-violet-900 shrink-0">Filter by Company:</span>
+                    <select
+                      value={selectedCompanyFilter}
+                      onChange={(e) => setSelectedCompanyFilter(e.target.value)}
+                      className="px-2.5 py-1 text-xs bg-white border border-violet-200 rounded-lg font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                    >
+                      <option value="all">🏢 All Companies (Universal Queue)</option>
+                      {companies.map((c) => (
+                        <option key={c._id} value={c._id}>
+                          {c.companyName} ({c.businessType})
+                        </option>
+                      ))}
+                    </select>
+                    {selectedCompanyFilter !== 'all' && (
+                      <button
+                        onClick={() => setSelectedCompanyFilter('all')}
+                        className="text-[11px] font-bold text-violet-600 hover:text-violet-800 underline ml-2 cursor-pointer"
+                      >
+                        Reset to All
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Filter Pills */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                  <span className="text-slate-400 font-semibold shrink-0 text-[11px]">Channel:</span>
+                  {['all', 'website', 'facebook', 'instagram', 'whatsapp', 'direct call'].map((channel) => (
+                    <button
+                      key={channel}
+                      onClick={() => setLeadSourceFilter(channel)}
+                      className={`px-2.5 py-1 rounded-lg font-bold text-[11px] capitalize transition cursor-pointer shrink-0 ${
+                        leadSourceFilter === channel
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {channel === 'direct call' ? 'Calls / Walk-in' : channel}
+                    </button>
+                  ))}
+                </div>
+
+                {filteredLeads.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 text-xs">
+                    No leads matching your current filters. Click "+ Add Manual Lead" above to record a new inquiry.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-500 uppercase font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="py-3 px-4">Client Name & Channel</th>
+                          {isSuperAdmin && <th className="py-3 px-4">Company</th>}
+                          <th className="py-3 px-4">Contact</th>
+                          <th className="py-3 px-4">Property Requirements</th>
+                          <th className="py-3 px-4">Budget</th>
+                          <th className="py-3 px-4">Assigned Agent</th>
+                          <th className="py-3 px-4 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredLeads.map((l) => (
+                          <tr key={l._id} className="hover:bg-slate-50/60 transition">
+                            <td className="py-3 px-4">
+                              <p className="font-bold text-slate-900 text-xs">{l.clientName || l.name}</p>
+                              <span className="inline-block mt-0.5 px-2 py-0.2 rounded text-[9px] font-bold bg-violet-50 text-violet-700 border border-violet-100">
+                                {l.source || 'Website'}
+                              </span>
+                            </td>
+                            {isSuperAdmin && (
+                              <td className="py-3 px-4">
+                                <span className="font-semibold text-slate-700 text-xs">
+                                  {l.company?.companyName || (typeof l.company === 'string' ? l.company.slice(0, 8) + '...' : 'System Tenant')}
+                                </span>
+                              </td>
+                            )}
+                            <td className="py-3 px-4 text-slate-600">
+                              <p>{l.email}</p>
+                              <p className="text-[11px] text-slate-400">{l.phone || 'No phone'}</p>
+                            </td>
+                            <td className="py-3 px-4 max-w-xs">
+                              <span className="font-semibold text-slate-800">{l.propertyType || 'Residential'}</span>
+                              <p className="text-[11px] text-slate-500 truncate">{l.requirements || l.message || 'Requirements pending'}</p>
+                            </td>
+                            <td className="py-3 px-4 font-bold text-slate-900 font-mono">
+                              {l.budget || 'N/A'}
+                            </td>
+                            <td className="py-3 px-4">
+                              {l.assignedAgent ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px]">
+                                  <CheckCircle className="w-3 h-3" />
+                                  <span>{l.assignedAgent.name || 'Assigned'}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px]">
+                                  <Clock className="w-3 h-3" />
+                                  <span>Unassigned</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="px-2 py-0.5 rounded-full font-bold text-[10px] bg-slate-100 text-slate-700 border border-slate-200">
+                                {l.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: ADMIN SETTINGS & PROFILE */}
+          {activeTab === 'settings' && (
+            <div className="space-y-6 animate-fade-in">
               <AdminSettingsWidget
                 user={user}
                 showToast={showToast}
-                onUserUpdated={(updated) => setUser(updated)}
+                onUserUpdated={handleUserUpdated}
               />
-            )}
-
-            {/* =================================================================
-                SCREEN 5: STAFF & AUTHORIZED MANAGERS DIRECTORY (ROOT OVERSIGHT)
-                ================================================================= */}
-            {activeNav === 'staff' && (
-              <div className="space-y-6 animate-fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                  <div>
-                    <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Staff & User Management</h2>
-                    <p className="text-xs text-slate-500 mt-0.5">Inspect all authorized sales managers, agents, and quotas</p>
-                  </div>
-
-                  <button
-                    onClick={() => setShowAddManagerModal(true)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs shadow-md transition cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Add Manager</span>
-                  </button>
-                </div>
-
-                {/* Managers Directory */}
-                <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-xs">
-                  <h3 className="font-bold text-base text-slate-900 mb-3">Authorized Managers Directory</h3>
-                  {managers.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-6 text-center">No managers registered yet. Click "+ Add Manager" above.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="text-slate-400 uppercase font-bold border-b border-slate-100 pb-2">
-                            <th className="pb-3 pl-1 font-semibold">Manager Profile</th>
-                            <th className="pb-3 text-center font-semibold">Department</th>
-                            <th className="pb-3 text-right font-semibold">Quota Target</th>
-                            <th className="pb-3 text-center font-semibold">Status</th>
-                            <th className="pb-3 text-right font-semibold pr-1">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {managers.map((mgr) => (
-                            <tr key={mgr._id || mgr.id} className="hover:bg-slate-50/70 transition">
-                              <td className="py-3.5 pl-1">
-                                <div className="flex items-center gap-3">
-                                  <img
-                                    src={mgr.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&auto=format&fit=crop&q=80'}
-                                    alt={mgr.name}
-                                    className="w-9 h-9 rounded-full object-cover border border-slate-200"
-                                  />
-                                  <div>
-                                    <p className="font-bold text-slate-900">{mgr.name}</p>
-                                    <p className="text-[11px] text-slate-400">{mgr.email}</p>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-3.5 text-center">
-                                <span className="px-2.5 py-0.5 rounded-full font-bold text-[11px] bg-slate-100 text-slate-700">
-                                  {mgr.department || 'Sales Management'}
-                                </span>
-                              </td>
-                              <td className="py-3.5 text-right font-extrabold text-slate-900">
-                                ${(mgr.monthlyQuota || 100000).toLocaleString()}/mo
-                              </td>
-                              <td className="py-3.5 text-center">
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[11px] bg-emerald-50 text-emerald-700">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                  <span>{mgr.status || 'Active'}</span>
-                                </span>
-                              </td>
-                              <td className="py-3.5 text-right pr-1">
-                                <button
-                                  onClick={() =>
-                                    navigate(
-                                      `/dashboard/manager?managerId=${mgr._id || mgr.id}&managerName=${encodeURIComponent(
-                                        mgr.name
-                                      )}&managerEmail=${encodeURIComponent(mgr.email)}&impersonate=true`
-                                    )
-                                  }
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs transition cursor-pointer"
-                                  title="View and inspect Manager Dashboard"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                  <span>View Dashboard</span>
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-          </main>
-
-        </div>
-
+            </div>
+          )}
+        </main>
       </div>
 
-      {/* =========================================================================
-          MODAL: ADD MANAGER (SUPER ADMIN ROOT CONTROL)
-          ========================================================================= */}
+      {/* CREATE MANAGER MODAL */}
       {showAddManagerModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden animate-scale-up">
-            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden animate-scale-up">
+            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <span>+ Add New Manager</span>
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    Super Admin Only
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">Authorize manager with team management permissions</p>
+                <h3 className="font-bold text-sm">Create Branch Manager Account</h3>
+                <p className="text-[11px] text-slate-400">Managers receive incoming leads and manage agents</p>
               </div>
               <button
                 onClick={() => setShowAddManagerModal(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-white transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddManagerSubmit} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleAddManagerSubmit} className="p-6 space-y-3.5 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Full Name *</label>
                 <input
                   type="text"
                   required
-                  value={newManager.name}
-                  onChange={(e) => setNewManager({ ...newManager, name: e.target.value })}
-                  placeholder="e.g. Haider Abbas"
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Work Email (Login ID) *</label>
-                <input
-                  type="email"
-                  required
-                  value={newManager.email}
-                  onChange={(e) => setNewManager({ ...newManager, email: e.target.value })}
-                  placeholder="e.g. haider@gmail.com"
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  value={managerForm.name}
+                  onChange={(e) => setManagerForm({ ...managerForm, name: e.target.value })}
+                  placeholder="e.g. David Sterling"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Department</label>
-                  <select
-                    value={newManager.department}
-                    onChange={(e) => setNewManager({ ...newManager, department: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  >
-                    <option value="Sales Management">Sales Management</option>
-                    <option value="Enterprise Solutions">Enterprise Solutions</option>
-                    <option value="Lead Operations">Lead Operations</option>
-                  </select>
+                  <label className="block font-semibold text-slate-700 mb-1">Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    value={managerForm.email}
+                    onChange={(e) => setManagerForm({ ...managerForm, email: e.target.value })}
+                    placeholder="david@crm.com"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-xs"
+                  />
                 </div>
-
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Monthly Quota ($)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Initial Password *</label>
+                  <input
+                    type="text"
+                    required
+                    value={managerForm.password}
+                    onChange={(e) => setManagerForm({ ...managerForm, password: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={managerForm.phone}
+                    onChange={(e) => setManagerForm({ ...managerForm, phone: e.target.value })}
+                    placeholder="+1 (555) 000-0000"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Monthly Target Quota ($)</label>
                   <input
                     type="number"
-                    value={newManager.monthlyQuota}
-                    onChange={(e) => setNewManager({ ...newManager, monthlyQuota: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    value={managerForm.monthlyQuota}
+                    onChange={(e) => setManagerForm({ ...managerForm, monthlyQuota: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Direct Password Assignment *</label>
+                <label className="block font-semibold text-slate-700 mb-1">Department / Branch</label>
                 <input
-                  type="password"
-                  required
-                  value={newManager.password}
-                  onChange={(e) => setNewManager({ ...newManager, password: e.target.value })}
-                  placeholder="Minimum 6 characters"
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  type="text"
+                  value={managerForm.department}
+                  onChange={(e) => setManagerForm({ ...managerForm, department: e.target.value })}
+                  placeholder="e.g. Luxury Residential Division"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-xs"
                 />
               </div>
 
@@ -1106,15 +1642,16 @@ const Dashboard = ({ defaultNav = 'dashboard' }) => {
                 <button
                   type="button"
                   onClick={() => setShowAddManagerModal(false)}
-                  className="px-4 py-2 rounded-xl text-slate-500 hover:bg-slate-100 font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-medium transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold transition shadow-xs cursor-pointer"
+                  disabled={submittingManager}
+                  className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-bold transition cursor-pointer shadow-xs"
                 >
-                  Register Manager
+                  {submittingManager ? 'Creating Manager...' : 'Create Manager Account'}
                 </button>
               </div>
             </form>
@@ -1122,6 +1659,36 @@ const Dashboard = ({ defaultNav = 'dashboard' }) => {
         </div>
       )}
 
+      {/* MANUAL LEAD ENTRY MODAL */}
+      <ManualLeadModal
+        isOpen={showAddLeadModal}
+        onClose={() => setShowAddLeadModal(false)}
+        onLeadCreated={handleLeadCreated}
+        agents={agents}
+      />
+
+      {/* SAAS COMPANY & ADMIN PROVISIONING MODAL */}
+      <CreateCompanyModal
+        isOpen={showCreateCompanyModal}
+        onClose={() => setShowCreateCompanyModal(false)}
+        onCompanyCreated={handleCompanyCreated}
+      />
+
+      {/* EDIT SAAS COMPANY SETTINGS MODAL */}
+      <EditCompanyModal
+        isOpen={showEditCompanyModal}
+        onClose={() => {
+          setShowEditCompanyModal(false)
+          setEditingCompany(null)
+        }}
+        company={editingCompany}
+        onCompanyUpdated={(updated) => {
+          setCompanies((prev) =>
+            prev.map((c) => (c._id === updated._id ? { ...c, ...updated } : c))
+          )
+          showToast(`Successfully updated settings for ${updated.companyName}`)
+        }}
+      />
     </div>
   )
 }

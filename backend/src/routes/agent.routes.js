@@ -1,29 +1,23 @@
 import { Router } from "express";
 import {
   getAgentDashboard,
-  updateLeadStatus,
-  updateDealStage,
-  submitDiscountApproval,
-  logMeetingNotes
+  getMyAssignedLeads as getAgentMyLeads,
+  updateLeadStatus
 } from "../controllers/agent.controller.js";
-import { optionalAuth } from "../middlewares/auth.middleware.js";
+import { getMyAssignedLeads, updateLeadByAgent } from "../controllers/lead.controller.js";
+import { verifyToken, requireAgent, optionalAuth } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
-// Allow optional auth to identify agent from session
-router.use(optionalAuth);
+// 1. GET /api/agent/my-leads - Fetch strictly assigned leads
+router.get("/my-leads", verifyToken, requireAgent, getMyAssignedLeads);
 
-// Agent Dashboard metrics, tasks, and personal pipeline
-router.get("/dashboard", getAgentDashboard);
+// 2. GET /api/agent/dashboard - Fetch strictly assigned leads & counts
+router.get("/dashboard", optionalAuth, getAgentDashboard);
 
-// Inline lead status updates
-router.patch("/leads/:id/status", updateLeadStatus);
-
-// Personal Kanban deal stage moves
-router.patch("/deals/:id/stage", updateDealStage);
-
-// Manager interaction: discount request and meeting notes
-router.post("/discount-request", submitDiscountApproval);
-router.post("/log-notes", logMeetingNotes);
+// 3. Lead status & follow-up note update
+router.put("/leads/:id", verifyToken, requireAgent, updateLeadByAgent);
+router.patch("/leads/:id", verifyToken, requireAgent, updateLeadByAgent);
+router.patch("/leads/:id/status", verifyToken, requireAgent, updateLeadStatus);
 
 export default router;

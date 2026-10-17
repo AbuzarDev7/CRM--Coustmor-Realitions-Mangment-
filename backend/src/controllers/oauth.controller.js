@@ -4,78 +4,110 @@ import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
 
 const getJwtSecret = () => process.env.JWT_SECRET || "mysecretkey123";
-const getClientUrl = () => process.env.CLIENT_URL || "http://localhost:5173";
-const getBackendUrl = () => process.env.BACKEND_URL || "http://localhost:3000";
+const getClientUrl = () => (process.env.CLIENT_URL || "http://localhost:5173").replace(/\/$/, "");
+const getBackendUrl = () => (process.env.BACKEND_URL || "http://localhost:3000").replace(/\/$/, "");
 
-// Helper to set cookie and redirect with authentication token
-const handleOAuthSuccess = (res, user) => {
-  const displayName = user.name || (user.email ? user.email.split("@")[0] : "");
-  const token = jwt.sign(
-    { userId: user._id, name: displayName, email: user.email, role: user.role, avatar: user.avatar || "" },
-    getJwtSecret(),
-    { expiresIn: "7d" }
-  );
+// Helper to set cookie and redirect (or send JSON) with authentication token
+const handleOAuthSuccess = (res, user, req) => {
+  try {
+    const displayName = user.name || (user.email ? user.email.split("@")[0] : "User");
+    const token = jwt.sign(
+      { userId: user._id, name: displayName, email: user.email, role: user.role, avatar: user.avatar || "" },
+      getJwtSecret(),
+      { expiresIn: "7d" }
+    );
 
-  res.cookie("refreshToken", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000
-  });
+    res.cookie("refreshToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
 
-  const queryParams = new URLSearchParams({
-    token,
-    email: user.email,
-    name: displayName,
-    role: user.role || "customer",
-    avatar: user.avatar || ""
-  });
+    const userData = {
+      id: user._id,
+      _id: user._id,
+      userId: user._id,
+      email: user.email,
+      name: displayName,
+      role: user.role || "customer",
+      avatar: user.avatar || ""
+    };
 
-  return res.redirect(`${getClientUrl()}/login?${queryParams.toString()}`);
+    // If client requested JSON via fetch / AJAX
+    if (req && (req.headers.accept?.includes("application/json") || req.xhr || req.method === "POST")) {
+      return res.status(200).json({
+        success: true,
+        token,
+        accessToken: token,
+        user: userData
+      });
+    }
+
+    const queryParams = new URLSearchParams({
+      token,
+      email: user.email,
+      name: displayName,
+      role: user.role || "customer",
+      avatar: user.avatar || ""
+    });
+
+    return res.redirect(`${getClientUrl()}/login?${queryParams.toString()}`);
+  } catch (error) {
+    console.error("handleOAuthSuccess error:", error);
+    return res.redirect(`${getClientUrl()}/login?error=${encodeURIComponent("Authentication token creation failed.")}`);
+  }
 };
 
 // 1. Google Auth - Step 1: Redirect to Google consent screen
 export const googleAuth = (req, res) => {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  try {
+    const clientId = (process.env.GOOGLE_CLIENT_ID || "").trim();
+    const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || "").trim();
 
-  if (!clientId || !clientSecret) {
-    return res.redirect(
-      `${getClientUrl()}/login?error=${encodeURIComponent(
-        "Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in backend .env file."
-      )}`
-    );
+    if (!clientId || !clientSecret) {
+      return res.redirect(
+        `${getClientUrl()}/login?error=${encodeURIComponent(
+          "Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in backend .env file."
+        )}`
+      );
+    }
+
+    const redirectUri = process.env.GOOGLE_CALLBACK_URL || `${getBackendUrl()}/api/auth/google/callback`;
+    const scope = ["openid", "email", "profile"].join(" ");
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
+      clientId
+    )}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(
+      scope
+    )}&access_type=offline&prompt=select_account`;
+
+    return res.redirect(googleAuthUrl);
+  } catch (error) {
+    console.error("Google Auth error:", error);
+    return res.redirect(`${getClientUrl()}/login?error=${encodeURIComponent("Failed to initialize Google login.")}`);
   }
-
-  const redirectUri = `${getBackendUrl()}/api/auth/google/callback`;
-  const scope = ["openid", "email", "profile"].join(" ");
-  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-    redirectUri
-  )}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=select_account`;
-
-  res.redirect(googleAuthUrl);
 };
 
 // 2. Google Auth - Step 2: Callback from Google
 export const googleCallback = async (req, res) => {
-  const { code, error } = req.query;
-
-  if (error || !code) {
-    return res.redirect(
-      `${getClientUrl()}/login?error=${encodeURIComponent(error || "Google authentication was cancelled.")}`
-    );
-  }
-
   try {
-    const redirectUri = `${getBackendUrl()}/api/auth/google/callback`;
+    const { code, error } = req.query;
+
+    if (error || !code) {
+      return res.redirect(
+        `${getClientUrl()}/login?error=${encodeURIComponent(error || "Google authentication was cancelled.")}`
+      );
+    }
+
+    const redirectUri = process.env.GOOGLE_CALLBACK_URL || `${getBackendUrl()}/api/auth/google/callback`;
 
     // Exchange code for access_token
     const tokenResponse = await axios.post(
       "https://oauth2.googleapis.com/token",
       new URLSearchParams({
         code,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        client_id: (process.env.GOOGLE_CLIENT_ID || "").trim(),
+        client_secret: (process.env.GOOGLE_CLIENT_SECRET || "").trim(),
         redirect_uri: redirectUri,
         grant_type: "authorization_code"
       }).toString(),
@@ -105,9 +137,7 @@ export const googleCallback = async (req, res) => {
     let user = await User.findOne({ email: normalizedEmail });
 
     if (user) {
-      if (!user.googleId) {
-        user.googleId = googleId;
-      }
+      if (!user.googleId) user.googleId = googleId;
       if (!user.name && name) user.name = name;
       if (!user.avatar && picture) user.avatar = picture;
       user.isVerified = true;
@@ -124,7 +154,7 @@ export const googleCallback = async (req, res) => {
       });
     }
 
-    return handleOAuthSuccess(res, user);
+    return handleOAuthSuccess(res, user, req);
   } catch (err) {
     console.error("Google OAuth Callback Error:", err.response?.data || err.message);
     const errorMessage =
@@ -135,71 +165,141 @@ export const googleCallback = async (req, res) => {
 
 // 3. GitHub Auth - Step 1: Redirect to GitHub consent screen
 export const githubAuth = (req, res) => {
-  const clientId = (process.env.GITHUB_CLIENT_ID || "").trim();
-  const clientSecret = (process.env.GITHUB_CLIENT_SECRET || "").trim();
+  try {
+    const clientId = (process.env.GITHUB_CLIENT_ID || "").trim();
+    const clientSecret = (process.env.GITHUB_CLIENT_SECRET || "").trim();
 
-  if (!clientId || !clientSecret) {
-    return res.redirect(
-      `${getClientUrl()}/login?error=${encodeURIComponent(
-        "GitHub OAuth is not configured. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in backend .env file."
-      )}`
-    );
+    if (!clientId || !clientSecret) {
+      return res.redirect(
+        `${getClientUrl()}/login?error=${encodeURIComponent(
+          "GitHub OAuth is not configured. Please set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in backend .env file."
+        )}`
+      );
+    }
+
+    // Only include redirect_uri if explicitly provided in environment variables.
+    // If omitted, GitHub automatically uses the callback URL configured in the GitHub OAuth application settings,
+    // avoiding the "The redirect_uri is not associated with this application" error.
+    const customCallbackUrl = (process.env.GITHUB_CALLBACK_URL || "").trim();
+    const redirectParam = customCallbackUrl ? `&redirect_uri=${encodeURIComponent(customCallbackUrl)}` : "";
+
+    console.log(`[GitHub Auth] Initiating OAuth redirect to GitHub with redirectParam: ${redirectParam || "default app callback"}`);
+
+    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}${redirectParam}&scope=read:user%20user:email`;
+
+    return res.redirect(githubAuthUrl);
+  } catch (error) {
+    console.error("GitHub Auth Error:", error);
+    return res.redirect(`${getClientUrl()}/login?error=${encodeURIComponent("Failed to initialize GitHub login.")}`);
   }
-
-  const redirectUri = `${getBackendUrl()}/api/auth/github/callback`;
-  console.log(`[GitHub Auth] Initiating OAuth redirect to GitHub with redirectUri: ${redirectUri}`);
-
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-    redirectUri
-  )}&scope=read:user%20user:email`;
-
-  res.redirect(githubAuthUrl);
 };
 
 // 4. GitHub Auth - Step 2: Callback from GitHub
 export const githubCallback = async (req, res) => {
-  const { code, error, error_description } = req.query;
-
-  if (error || !code) {
-    console.error("[GitHub Callback] Cancelled or error query param:", error || error_description);
-    return res.redirect(
-      `${getClientUrl()}/login?error=${encodeURIComponent(
-        error_description || error || "GitHub authentication was cancelled."
-      )}`
-    );
-  }
-
   try {
+    const code = req.query.code || req.body?.code;
+    const error = req.query.error || req.body?.error;
+    const error_description = req.query.error_description || req.body?.error_description;
+
+    const isJsonRequest = Boolean(req.headers.accept?.includes("application/json") || req.xhr || req.method === "POST");
+
+    if (error || !code) {
+      console.error("[GitHub Callback] Cancelled or error parameter:", error || error_description);
+      const errMsg = error_description || error || "GitHub authentication was cancelled.";
+      if (isJsonRequest) {
+        return res.status(400).json({ error: errMsg });
+      }
+      return res.redirect(`${getClientUrl()}/login?error=${encodeURIComponent(errMsg)}`);
+    }
+
     const clientId = (process.env.GITHUB_CLIENT_ID || "").trim();
     const clientSecret = (process.env.GITHUB_CLIENT_SECRET || "").trim();
-    const redirectUri = `${getBackendUrl()}/api/auth/github/callback`;
+    const customCallbackUrl = (process.env.GITHUB_CALLBACK_URL || "").trim();
 
-    console.log("[GitHub Callback] Exchanging code for access token...");
+    console.log("[GitHub Callback] Exchanging authorization code for access token...");
 
-    // Exchange code for access_token
-    const tokenResponse = await axios.post(
-      "https://github.com/login/oauth/access_token",
-      {
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-        redirect_uri: redirectUri
-      },
-      {
-        headers: { Accept: "application/json" }
+    let tokenData = null;
+
+    // Step 2a: If customCallbackUrl is set, try with that redirect_uri first
+    if (customCallbackUrl) {
+      try {
+        const tokenResponse = await axios.post(
+          "https://github.com/login/oauth/access_token",
+          {
+            client_id: clientId,
+            client_secret: clientSecret,
+            code,
+            redirect_uri: customCallbackUrl
+          },
+          {
+            headers: { Accept: "application/json" }
+          }
+        );
+        tokenData = tokenResponse.data;
+      } catch (exchangeErr) {
+        console.warn("[GitHub Callback] Custom redirect_uri exchange failed:", exchangeErr.message);
       }
-    );
+    }
 
-    const tokenData = tokenResponse.data;
-    console.log("[GitHub Callback] Token response status:", tokenData.error ? "Error: " + tokenData.error_description : "Success");
+    // Step 2b: Standard token exchange without redirect_uri (GitHub uses its default callback)
+    if (!tokenData || tokenData.error || !tokenData.access_token) {
+      try {
+        const retryResponse = await axios.post(
+          "https://github.com/login/oauth/access_token",
+          {
+            client_id: clientId,
+            client_secret: clientSecret,
+            code
+          },
+          {
+            headers: { Accept: "application/json" }
+          }
+        );
+        if (retryResponse.data && !retryResponse.data.error) {
+          tokenData = retryResponse.data;
+        } else if (!tokenData) {
+          tokenData = retryResponse.data;
+        }
+      } catch (retryErr) {
+        console.warn("[GitHub Callback] Token exchange without redirect_uri failed:", retryErr.message);
+      }
+    }
 
-    if (tokenData.error || !tokenData.access_token) {
-      throw new Error(tokenData.error_description || tokenData.error || "Failed to obtain GitHub access token.");
+    // Step 2c: Fallback with backend default callback URL if still failing
+    if (!tokenData || tokenData.error || !tokenData.access_token) {
+      try {
+        const fallbackResponse = await axios.post(
+          "https://github.com/login/oauth/access_token",
+          {
+            client_id: clientId,
+            client_secret: clientSecret,
+            code,
+            redirect_uri: `${getBackendUrl()}/api/auth/github/callback`
+          },
+          {
+            headers: { Accept: "application/json" }
+          }
+        );
+        if (fallbackResponse.data && !fallbackResponse.data.error) {
+          tokenData = fallbackResponse.data;
+        }
+      } catch (fbErr) {
+        console.warn("[GitHub Callback] Fallback with backend URL failed:", fbErr.message);
+      }
+    }
+
+    if (!tokenData || tokenData.error || !tokenData.access_token) {
+      const errMsg = tokenData?.error_description || tokenData?.error || "Failed to obtain GitHub access token.";
+      console.error("[GitHub Callback] Token error:", errMsg);
+      if (isJsonRequest) {
+        return res.status(400).json({ error: errMsg });
+      }
+      return res.redirect(`${getClientUrl()}/login?error=${encodeURIComponent(errMsg)}`);
     }
 
     const access_token = tokenData.access_token;
 
-    // Get user profile from GitHub
+    // Get user profile from GitHub API
     console.log("[GitHub Callback] Fetching user profile from GitHub API...");
     const profileResponse = await axios.get("https://api.github.com/user", {
       headers: {
@@ -209,13 +309,13 @@ export const githubCallback = async (req, res) => {
     });
 
     const githubUser = profileResponse.data;
-    console.log("[GitHub Callback] GitHub user fetched:", githubUser.login, "ID:", githubUser.id);
+    console.log("[GitHub Callback] GitHub profile fetched:", githubUser.login, "ID:", githubUser.id);
     let email = githubUser.email;
 
     // If email is private on GitHub profile, fetch from /user/emails
     if (!email) {
       try {
-        console.log("[GitHub Callback] Profile email is null. Fetching /user/emails...");
+        console.log("[GitHub Callback] Profile email is null/private. Fetching /user/emails...");
         const emailsResponse = await axios.get("https://api.github.com/user/emails", {
           headers: {
             Authorization: `Bearer ${access_token}`,
@@ -276,11 +376,15 @@ export const githubCallback = async (req, res) => {
       });
     }
 
-    return handleOAuthSuccess(res, user);
+    return handleOAuthSuccess(res, user, req);
   } catch (err) {
     console.error("GitHub OAuth Callback Error:", err.response?.data || err.message);
     const errorMessage =
       err.response?.data?.error_description || err.message || "Failed to authenticate with GitHub.";
+    if (req.headers.accept?.includes("application/json") || req.xhr || req.method === "POST") {
+      return res.status(500).json({ error: errorMessage });
+    }
     return res.redirect(`${getClientUrl()}/login?error=${encodeURIComponent(errorMessage)}`);
   }
 };
+

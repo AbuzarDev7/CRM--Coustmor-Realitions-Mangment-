@@ -7,16 +7,7 @@ let ioInstance = null;
 export const initChatSocket = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
-      origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        if (
-          /^http:\/\/localhost:\d+$/.test(origin) ||
-          /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)
-        ) {
-          return callback(null, true);
-        }
-        return callback(null, true);
-      },
+      origin: (origin, callback) => callback(null, true),
       credentials: true,
       methods: ["GET", "POST", "PATCH"]
     }

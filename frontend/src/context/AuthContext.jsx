@@ -53,7 +53,9 @@ export const AuthProvider = ({ children }) => {
             }
             try {
               localStorage.setItem('crm_user', JSON.stringify(merged))
-            } catch (e) {}
+            } catch {
+              // ignore storage write errors
+            }
             return merged
           })
         }
@@ -88,7 +90,9 @@ export const AuthProvider = ({ children }) => {
     try {
       localStorage.removeItem('crm_token')
       localStorage.removeItem('crm_user')
-    } catch (e) {}
+    } catch {
+      // ignore storage removal errors
+    }
   }
 
   // Update User profile in context & localStorage
@@ -97,7 +101,9 @@ export const AuthProvider = ({ children }) => {
       const updated = { ...prev, ...updatedFields }
       try {
         localStorage.setItem('crm_user', JSON.stringify(updated))
-      } catch (e) {}
+      } catch {
+        // ignore storage write errors
+      }
       return updated
     })
   }

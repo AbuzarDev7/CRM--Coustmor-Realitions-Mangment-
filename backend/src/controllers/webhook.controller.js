@@ -172,7 +172,7 @@ export const handleMetaWebhook = async (req, res) => {
           }
 
           if (existingLead) {
-            console.log(`ℹ️ Lead with leadgen_id ${leadgenId} already ingested. Skipping duplicate.`);
+            console.log(` Lead with leadgen_id ${leadgenId} already ingested. Skipping duplicate.`);
             savedLeads.push(existingLead);
             continue;
           }

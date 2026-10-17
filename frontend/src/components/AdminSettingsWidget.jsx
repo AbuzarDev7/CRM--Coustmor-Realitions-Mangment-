@@ -295,41 +295,41 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 font-sans">
       {/* =========================================================================
           1. HEADER & GLOBAL SAVE BUTTON
           ========================================================================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold text-violet-700 tracking-wider uppercase bg-violet-100/70 border border-violet-200 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-xs font-bold text-violet-700 tracking-wider uppercase bg-violet-50 border border-violet-200 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5">
               <Settings className="w-3.5 h-3.5" />
               Platform Configuration Suite
             </span>
             <span className="text-xs text-slate-400">• v2.4.0 Production</span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
             Admin & Platform Settings
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+          <p className="text-sm text-slate-500 mt-0.5">
             Manage global CRM company parameters, security policies, access control matrix, and external integrations.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={handleResetDefaults}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs shadow-xs transition cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs shadow-xs transition cursor-pointer"
             title="Reset to defaults"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset</span>
+            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+            <span>Reset Defaults</span>
           </button>
 
           <button
             onClick={handleSaveSettings}
             disabled={savingSettings}
-            className="flex items-center gap-2 px-5 py-2 rounded-full bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-md shadow-violet-600/25 hover:scale-[1.02] transition cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs shadow-sm hover:scale-[1.01] transition cursor-pointer disabled:opacity-50"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>{savingSettings ? 'Saving...' : 'Save System Changes'}</span>
@@ -340,7 +340,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
       {/* =========================================================================
           2. SETTINGS NAVIGATION TABS
           ========================================================================= */}
-      <div className="bg-slate-100 p-1.5 rounded-2xl flex flex-wrap gap-1.5 text-xs font-bold">
+      <div className="bg-slate-100 p-1 rounded-xl flex flex-wrap gap-1 border border-slate-200/60 text-xs font-semibold">
         {[
           { id: 'general', label: 'Company Profile', icon: Building },
           { id: 'security', label: 'Security & Access', icon: Lock },
@@ -355,9 +355,9 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition cursor-pointer ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition cursor-pointer ${
                 isActive
-                  ? 'bg-white text-slate-900 shadow-sm font-extrabold'
+                  ? 'bg-white text-violet-700 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
@@ -383,125 +383,125 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
             showToast={showToast}
           />
 
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
-          <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-extrabold text-slate-900">
-                Organization Information & Locale
-              </h3>
-              <p className="text-xs text-slate-500">
-                General company branding and contact specifications displayed across user dashboards and invoices
-              </p>
-            </div>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 border border-violet-200">
-              Verified Enterprise
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-            <div className="space-y-4">
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-6">
+            <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <label className="block font-bold text-slate-700 mb-1.5">
-                  Registered Enterprise Legal Name *
-                </label>
-                <input
-                  type="text"
-                  value={settings.orgName}
-                  onChange={(e) => handleChange('orgName', e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition"
-                />
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Organization Information & Locale
+                </h3>
+                <p className="text-xs text-slate-500">
+                  General company branding and contact specifications displayed across user dashboards and invoices
+                </p>
               </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1.5">
-                  Primary Super Admin Email Address *
-                </label>
-                <input
-                  type="email"
-                  value={settings.adminEmail}
-                  onChange={(e) => handleChange('adminEmail', e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1.5">
-                  Customer Support Portal Endpoint
-                </label>
-                <input
-                  type="url"
-                  value={settings.supportPortalUrl}
-                  onChange={(e) => handleChange('supportPortalUrl', e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition"
-                />
-              </div>
+              <span className="text-xs font-bold tracking-wider px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 border border-violet-200">
+                Verified Enterprise
+              </span>
             </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+              <div className="space-y-4">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1.5">
-                    Platform Timezone
+                    Registered Enterprise Legal Name *
                   </label>
-                  <select
-                    value={settings.timezone}
-                    onChange={(e) => handleChange('timezone', e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-xs"
-                  >
-                    <option value="America/New_York (EST, UTC-5)">Eastern Time (US / EST)</option>
-                    <option value="America/Los_Angeles (PST, UTC-8)">Pacific Time (US / PST)</option>
-                    <option value="Europe/London (GMT, UTC+0)">London (GMT / UTC+0)</option>
-                    <option value="Asia/Karachi (PKT, UTC+5)">Karachi / Islamabad (UTC+5)</option>
-                    <option value="Asia/Dubai (GST, UTC+4)">Dubai (GST, UTC+4)</option>
-                  </select>
+                  <input
+                    type="text"
+                    value={settings.orgName}
+                    onChange={(e) => handleChange('orgName', e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition text-sm"
+                  />
                 </div>
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1.5">
-                    Base Currency
+                    Primary Super Admin Email Address *
                   </label>
-                  <select
-                    value={settings.currency}
-                    onChange={(e) => handleChange('currency', e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-xs"
-                  >
-                    <option value="USD ($)">USD ($) - US Dollar</option>
-                    <option value="EUR (€)">EUR (€) - Euro</option>
-                    <option value="GBP (£)">GBP (£) - British Pound</option>
-                    <option value="PKR (₨)">PKR (₨) - Pakistani Rupee</option>
-                    <option value="AED (د.إ)">AED (د.إ) - UAE Dirham</option>
-                  </select>
+                  <input
+                    type="email"
+                    value={settings.adminEmail}
+                    onChange={(e) => handleChange('adminEmail', e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1.5">
+                    Customer Support Portal Endpoint
+                  </label>
+                  <input
+                    type="url"
+                    value={settings.supportPortalUrl}
+                    onChange={(e) => handleChange('supportPortalUrl', e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition text-sm"
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1.5">
-                  Official Corporate Physical Address
-                </label>
-                <input
-                  type="text"
-                  value={settings.address}
-                  onChange={(e) => handleChange('address', e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition"
-                />
-              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      Platform Timezone
+                    </label>
+                    <select
+                      value={settings.timezone}
+                      onChange={(e) => handleChange('timezone', e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-xs"
+                    >
+                      <option value="America/New_York (EST, UTC-5)">Eastern Time (US / EST)</option>
+                      <option value="America/Los_Angeles (PST, UTC-8)">Pacific Time (US / PST)</option>
+                      <option value="Europe/London (GMT, UTC+0)">London (GMT / UTC+0)</option>
+                      <option value="Asia/Karachi (PKT, UTC+5)">Karachi / Islamabad (UTC+5)</option>
+                      <option value="Asia/Dubai (GST, UTC+4)">Dubai (GST, UTC+4)</option>
+                    </select>
+                  </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1.5">
-                  Direct Line Contact Phone
-                </label>
-                <input
-                  type="text"
-                  value={settings.contactPhone}
-                  onChange={(e) => handleChange('contactPhone', e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition"
-                />
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      Base Currency
+                    </label>
+                    <select
+                      value={settings.currency}
+                      onChange={(e) => handleChange('currency', e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-xs"
+                    >
+                      <option value="USD ($)">USD ($) - US Dollar</option>
+                      <option value="EUR (€)">EUR (€) - Euro</option>
+                      <option value="GBP (£)">GBP (£) - British Pound</option>
+                      <option value="PKR (₨)">PKR (₨) - Pakistani Rupee</option>
+                      <option value="AED (د.إ)">AED (د.إ) - UAE Dirham</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1.5">
+                    Official Corporate Physical Address
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.address}
+                    onChange={(e) => handleChange('address', e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1.5">
+                    Direct Line Contact Phone
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.contactPhone}
+                    onChange={(e) => handleChange('contactPhone', e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition text-sm"
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
       {/* =========================================================================
           4. TAB 2: SECURITY & ACCESS POLICIES
@@ -509,7 +509,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
       {activeTab === 'security' && (
         <div className="space-y-6">
           {/* Security policy toggles */}
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-6">
             <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-extrabold text-slate-900">
@@ -604,7 +604,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
                       value={settings.allowedIpRanges}
                       onChange={(e) => handleChange('allowedIpRanges', e.target.value)}
                       placeholder="e.g. 192.168.1.0/24, 10.0.0.0/16"
-                      className="w-full max-w-md px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono"
+                      className="w-full max-w-md px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono"
                     />
                   )}
                 </div>
@@ -626,15 +626,17 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
           </div>
 
           {/* Change Super Admin Password Box */}
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs">
-            <h3 className="text-base font-extrabold text-slate-900 mb-1">
-              Update Super Admin Credential
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Directly reset the master password used to authenticate into this Admin Suite
-            </p>
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-4">
+            <div>
+              <h3 className="text-base font-extrabold text-slate-900">
+                Update Super Admin Credential
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Directly reset the master password used to authenticate into this Admin Suite
+              </p>
+            </div>
 
-            <form onSubmit={handlePasswordSubmit} className="max-w-md space-y-3.5 text-xs">
+            <form onSubmit={handlePasswordSubmit} className="max-w-xl space-y-4 text-xs">
               {passwordFeedback && (
                 <div className="p-3 rounded-xl bg-red-50 text-red-700 font-semibold border border-red-200">
                   {passwordFeedback}
@@ -642,45 +644,45 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
               )}
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Current Master Password</label>
+                <label className="block font-bold text-slate-700 mb-1.5">Current Master Password</label>
                 <input
                   type="password"
                   required
                   value={passwordState.currentPassword}
                   onChange={(e) => setPasswordState({ ...passwordState, currentPassword: e.target.value })}
                   placeholder="••••••••••••"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-sm"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">New Password</label>
+                  <label className="block font-bold text-slate-700 mb-1.5">New Password</label>
                   <input
                     type="password"
                     required
                     value={passwordState.newPassword}
                     onChange={(e) => setPasswordState({ ...passwordState, newPassword: e.target.value })}
                     placeholder="Min 8 characters"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Confirm Password</label>
+                  <label className="block font-bold text-slate-700 mb-1.5">Confirm Password</label>
                   <input
                     type="password"
                     required
                     value={passwordState.confirmPassword}
                     onChange={(e) => setPasswordState({ ...passwordState, confirmPassword: e.target.value })}
                     placeholder="Confirm password"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 text-sm"
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition cursor-pointer"
               >
                 Update Master Password
               </button>
@@ -693,7 +695,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
           5. TAB 3: ROLE-BASED ACCESS CONTROL (RBAC) MATRIX
           ========================================================================= */}
       {activeTab === 'roles' && (
-        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-6">
           <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h3 className="text-base font-extrabold text-slate-900">
@@ -703,20 +705,20 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
                 Operational authority levels enforced across Admin, Regional Manager, Sales Agent, and Customer accounts
               </p>
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+            <span className="text-xs font-bold tracking-wider text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">
               4 System Roles
             </span>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
             <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="text-slate-400 uppercase font-bold border-b border-slate-100 pb-2">
-                  <th className="pb-3 font-semibold pl-1">Functional Capability</th>
-                  <th className="pb-3 font-semibold text-center text-violet-700">Super Admin</th>
-                  <th className="pb-3 font-semibold text-center text-indigo-700">Sales Manager</th>
-                  <th className="pb-3 font-semibold text-center text-sky-700">Sales Agent</th>
-                  <th className="pb-3 font-semibold text-center text-slate-600">Client / Customer</th>
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-6 py-3.5 text-left">Functional Capability</th>
+                  <th className="px-6 py-3.5 text-center text-violet-700">Super Admin</th>
+                  <th className="px-6 py-3.5 text-center text-indigo-700">Sales Manager</th>
+                  <th className="px-6 py-3.5 text-center text-sky-700">Sales Agent</th>
+                  <th className="px-6 py-3.5 text-center text-slate-600">Client / Customer</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
@@ -731,8 +733,8 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
                   { feature: 'Submit Inquiries & Review Invoices in Portal', admin: false, manager: false, agent: false, client: true }
                 ].map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3 pl-1 font-bold text-slate-800">{row.feature}</td>
-                    <td className="py-3 text-center">
+                    <td className="px-6 py-4 font-semibold text-slate-900 text-sm">{row.feature}</td>
+                    <td className="px-6 py-4 text-center">
                       {row.admin ? (
                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-700">
                           <Check className="w-3.5 h-3.5" />
@@ -741,7 +743,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
                         <span className="text-slate-300">—</span>
                       )}
                     </td>
-                    <td className="py-3 text-center">
+                    <td className="px-6 py-4 text-center">
                       {row.manager ? (
                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-700">
                           <Check className="w-3.5 h-3.5" />
@@ -750,7 +752,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
                         <span className="text-slate-300">—</span>
                       )}
                     </td>
-                    <td className="py-3 text-center">
+                    <td className="px-6 py-4 text-center">
                       {row.agent ? (
                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-sky-100 text-sky-700">
                           <Check className="w-3.5 h-3.5" />
@@ -759,7 +761,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
                         <span className="text-slate-300">—</span>
                       )}
                     </td>
-                    <td className="py-3 text-center">
+                    <td className="px-6 py-4 text-center">
                       {row.client ? (
                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-700">
                           <Check className="w-3.5 h-3.5" />
@@ -780,7 +782,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
           6. TAB 4: NOTIFICATIONS & AUTOMATION TRIGGERS
           ========================================================================= */}
       {activeTab === 'notifications' && (
-        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-6">
           <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h3 className="text-base font-extrabold text-slate-900">
@@ -830,7 +832,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
                     type="number"
                     value={settings.highValueThreshold}
                     onChange={(e) => handleChange('highValueThreshold', Number(e.target.value))}
-                    className="w-28 px-2.5 py-1 rounded-lg border border-slate-200 font-bold text-slate-800"
+                    className="w-28 px-3 py-1.5 rounded-lg border border-slate-200 font-bold text-slate-800 text-xs"
                   />
                 </div>
               </div>
@@ -904,7 +906,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
       {activeTab === 'integrations' && (
         <div className="space-y-6">
           {/* Inbound Lead Webhook Card */}
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs space-y-5">
+          <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-5">
             <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-extrabold text-slate-900">
@@ -930,7 +932,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
                     type="text"
                     readOnly
                     value={`${WEBHOOK_API_URL || 'http://localhost:3000/api/webhooks'}/leads`}
-                    className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-mono text-slate-700 text-xs focus:outline-none"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-mono text-slate-700 text-xs focus:outline-none"
                   />
                   <button
                     onClick={handleCopyWebhookUrl}
@@ -960,7 +962,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
                     type="text"
                     readOnly
                     value={settings.webhookSecretKey}
-                    className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-mono text-slate-700 text-xs focus:outline-none"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-mono text-slate-700 text-xs focus:outline-none"
                   />
                   <button
                     onClick={handleCopySecretKey}
@@ -988,8 +990,8 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
           </div>
 
           {/* Active integrations status cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="p-6 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
               <div>
                 <p className="font-bold text-sm text-slate-800">Meta / Facebook Ads</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">Automated lead ingestion</p>
@@ -999,7 +1001,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
               </span>
             </div>
 
-            <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
+            <div className="p-6 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
               <div>
                 <p className="font-bold text-sm text-slate-800">WhatsApp Cloud API</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">Customer messaging stream</p>
@@ -1009,7 +1011,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
               </span>
             </div>
 
-            <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between">
+            <div className="p-6 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
               <div>
                 <p className="font-bold text-sm text-slate-800">Redis In-Memory Cache</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">High velocity socket sync</p>
@@ -1026,7 +1028,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
           8. TAB 6: DATA BACKUP & MAINTENANCE
           ========================================================================= */}
       {activeTab === 'backup' && (
-        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-6">
           <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h3 className="text-base font-extrabold text-slate-900">
@@ -1040,7 +1042,7 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
           </div>
 
           <div className="space-y-4 text-xs">
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <p className="font-bold text-slate-800 text-sm">Export System Configuration Snapshot</p>
                 <p className="text-slate-500 mt-0.5">
@@ -1049,13 +1051,13 @@ const AdminSettingsWidget = ({ user, showToast, onUserUpdated }) => {
               </div>
               <button
                 onClick={handleExportSystemBackup}
-                className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold shadow-sm transition cursor-pointer whitespace-nowrap"
+                className="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold shadow-xs transition cursor-pointer whitespace-nowrap"
               >
                 Download Snapshot (.json)
               </button>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <p className="font-bold text-slate-800 text-sm">Purge Expired Session Cache</p>
                 <p className="text-slate-500 mt-0.5">

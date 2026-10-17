@@ -2,6 +2,12 @@ import mongoose from "mongoose";
 
 const notificationSchema = new mongoose.Schema(
   {
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Company",
+      default: null,
+      index: true
+    },
     title: {
       type: String,
       required: true,

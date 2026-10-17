@@ -36,14 +36,15 @@ const ProtectedRoute = ({ allowedRoles = [], children }) => {
     allowedRoles.length === 0 ||
     allowedRoles.some((r) => {
       const targetRole = r.toLowerCase().trim()
-      if (targetRole === 'superadmin' && normalizedRole === 'admin') return true
-      if (targetRole === 'admin' && (normalizedRole === 'admin' || rawRole === 'superadmin')) return true
-      return targetRole === normalizedRole
+      if (targetRole === 'superadmin' && (normalizedRole === 'admin' || rawRole === 'superadmin')) return true
+      if (targetRole === 'admin' && (normalizedRole === 'admin' || rawRole === 'superadmin' || rawRole === 'company_admin')) return true
+      if (targetRole === 'company_admin' && (rawRole === 'company_admin' || normalizedRole === 'admin' || rawRole === 'superadmin')) return true
+      return targetRole === normalizedRole || targetRole === rawRole
     })
 
   if (!hasPermission) {
     // If not authorized for this route, redirect to their role's native dashboard
-    if (normalizedRole === 'admin') {
+    if (normalizedRole === 'admin' || rawRole === 'company_admin') {
       return <Navigate to="/dashboard" replace />
     } else if (normalizedRole === 'manager') {
       return <Navigate to="/manager-dashboard" replace />

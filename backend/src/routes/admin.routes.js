@@ -1,11 +1,13 @@
 import { Router } from "express";
 import {
   getDashboardStats,
+  getAdminOverview,
   getStaffList,
   addStaffMember,
   deleteStaffMember,
   addManager,
   getManagers,
+  deleteManager,
   getActivities,
   addActivity,
   getNotifications,
@@ -24,6 +26,7 @@ const router = Router();
 router.use(optionalAuth);
 
 // Analytics & KPI stats
+router.get("/overview", getAdminOverview);
 router.get("/dashboard/stats", getDashboardStats);
 
 // Staff Management
@@ -34,6 +37,8 @@ router.delete("/staff/:id", deleteStaffMember);
 // Super Admin: Managers Management
 router.get("/managers", getManagers);
 router.post("/managers", addManager);
+router.post("/add-manager", addManager);
+router.delete("/managers/:id", deleteManager);
 
 // Activity Timeline
 router.get("/activities", getActivities);
